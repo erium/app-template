@@ -1,0 +1,155 @@
+# llm.txt — AI Agent Brief
+
+A dense brief for AI coding agents working in this repo. Read this first. For full detail, see `CONVENTIONS.md` (coding standards) and `README.md` (quick start).
+
+## What This Is
+
+A generic full-stack TypeScript template: React frontend + Express REST backend + PostgreSQL via Drizzle ORM. Ships with auth, multi-tenancy (tenant → users → invitations), i18n (de/en), Stripe billing, PDF export (Playwright), and 53 shadcn/ui components. Single `package.json` (no monorepo). Branding lives in `shared/config.ts`.
+
+## Stack
+
+- **Runtime:** Node 20+, pnpm 10
+- **Frontend:** React 19, Vite 7, wouter 3 (routing), TailwindCSS 4, shadcn/ui, react-hook-form 7, react-i18next 16, @tanstack/react-query 5, sonner (toasts)
+- **Backend:** Express 4, drizzle-orm 0.44 + pg 8 (PostgreSQL), jose 6 (JWT), bcryptjs 3, zod 4, nodemailer 8, stripe 20, playwright 1.58
+- **TypeScript:** 5.9, strict mode
+
+## Commands
+
+```bash
+pnpm dev         # dev server on :8497 (Vite + tsx watch)
+pnpm build       # Vite client build + esbuild server bundle
+pnpm check       # tsc --noEmit
+pnpm db:push     # apply drizzle/schema.ts to Postgres
+pnpm db:seed     # idempotent seed: tenant + admin@example.com / ChangeMe!2026
+```
+
+PostgreSQL setup: `bash setup-postgres.sh` (apt-installs locally, not Docker). Uninstall: `bash setup-postgres.sh uninstall`.
+
+## Directory Map
+
+```
+client/src/
+  pages/          one file per App.tsx route
+  components/     reusable + components/ui/ (shadcn — don't hand-edit)
+  lib/api.ts      typed fetch wrapper — only way to hit the server
+  _core/hooks/    useAuth and other cross-cutting hooks
+  locales/        de/common.json, en/common.json
+server/
+  _core/          entry point, env, cookies, vite dev middleware
+  middleware/     auth.ts: authenticateUser, requireAuth, requireAdmin
+  routes/         Express routers per resource (auth, tenant, payment, export)
+  db.ts           ALL drizzle queries go here
+  email.ts, stripe.ts, pdfExport.ts, webhookRoutes.ts
+drizzle/
+  schema.ts       tenants, users, invitations, transactions
+  seed.ts         default tenant + admin user
+shared/
+  config.ts       APP_NAME, APP_DESCRIPTION, SUPPORT_EMAIL
+  const.ts        COOKIE_NAME, ONE_YEAR_MS
+```
+
+## Request Lifecycle
+
+```
+Browser ─fetch→ Vite dev proxy / Express (prod static) ─→ authenticateUser middleware (reads JWT cookie, sets req.user)
+ ─→ router (zod.parse body) ─→ requireAuth / requireAdmin if needed ─→ handler
+ ─→ server/db.ts helper ─→ drizzle-orm ─→ pg pool ─→ PostgreSQL
+ ← JSON { data } or { error }
+```
+
+## Auth Tiers
+
+Three levels, applied as Express middleware from `server/middleware/auth.ts`:
+
+| Tier | Middleware | Examples |
+|---|---|---|
+| Public | none | `POST /api/auth/login`, `POST /api/auth/register` |
+| Protected | `requireAuth` | `GET /api/auth/me`, `POST /api/payment/checkout` |
+| Admin | `requireAuth` + `requireAdmin` | `POST /api/tenant/invite`, `DELETE /api/tenant` |
+
+Apply at the router level when every handler needs the same tier:
+
+```ts
+router.use(requireAuth);
+router.put("/users/:id/role", requireAdmin, handler);
+```
+
+Never check roles inside a handler when middleware can enforce it.
+
+## Feature Recipe
+
+To add a new feature end-to-end:
+
+1. **Schema (if needed)** — edit `drizzle/schema.ts`, run `pnpm db:push`.
+2. **DB helpers** — add async functions to `server/db.ts` using drizzle-orm. Use `.returning()` for writes, destructure `[row]` for single-row reads.
+3. **API route** — create `server/routes/<resource>.ts` exporting an Express `Router`. Validate body with zod. Register in `server/routes/index.ts`.
+4. **API client method** — add a typed entry to `client/src/lib/api.ts`. Add its query key to `queryKeys` if used with react-query.
+5. **Page or component** — create in `client/src/pages/` or `client/src/components/`. Fetch via `useQuery({ queryFn: api.<method> })`. Wire it into `client/src/App.tsx` if it's a page.
+6. **i18n** — add every user-facing string as a key in `client/src/locales/de/common.json` AND `en/common.json`. Use `const { t } = useTranslation(); t("key")`.
+7. **Verify** — `pnpm check` (types), `pnpm lint`, manual test at `http://localhost:8497`.
+
+## Quick Patterns
+
+Drizzle single-row query:
+```ts
+const [user] = await db.select().from(users).where(eq(users.id, id)).limit(1);
+```
+
+Drizzle insert with returning:
+```ts
+const [row] = await db.insert(users).values(data).returning();
+```
+
+Drizzle transaction:
+```ts
+await db.transaction(async (tx) => {
+  await tx.insert(tenants).values(...);
+  await tx.insert(users).values(...);
+});
+```
+
+Client query:
+```ts
+const { data } = useQuery({ queryKey: queryKeys.me, queryFn: api.getMe });
+```
+
+Client mutation:
+```ts
+const mutation = useMutation({
+  mutationFn: api.login,
+  onSuccess: () => toast.success(t("login_success")),
+});
+```
+
+Express route with validation:
+```ts
+const schema = z.object({ email: z.string().email(), password: z.string().min(6) });
+router.post("/login", async (req, res) => {
+  const body = schema.parse(req.body);
+  // ...
+});
+```
+
+## Anti-Patterns
+
+Never:
+
+- Reintroduce tRPC. The API is Express REST by design.
+- Add `axios`. Use the `fetch`-based `api.*` wrapper.
+- Call `fetch` directly from a component. Go through `client/src/lib/api.ts`.
+- Scatter drizzle queries across route handlers. Put them in `server/db.ts`.
+- Hardcode `APP_NAME`, support email, or copy strings. Use `shared/config.ts` and i18n keys.
+- Commit `.env`, `pg-data/`, `uploads/`, `data/`, `dist/`.
+- Skip git hooks with `--no-verify`.
+- Use `any`, `console.log` in committed code, or browser `alert`.
+
+Full list in `CONVENTIONS.md`.
+
+## Pointers
+
+- **[`CONVENTIONS.md`](./CONVENTIONS.md)** — complete coding standards, naming, file layout, testing.
+- **[`ARCHITECTURE.md`](./ARCHITECTURE.md)** — system overview with ASCII diagrams.
+- **[`README.md`](./README.md)** — human-oriented quick start and customization.
+- **[`docs/architecture-logical.md`](./docs/architecture-logical.md)** — runtime view and sequence diagrams (mermaid).
+- **[`docs/architecture-development.md`](./docs/architecture-development.md)** — build pipeline and code organization.
+- **[`docs/architecture-data.md`](./docs/architecture-data.md)** — schema, data flow, state.

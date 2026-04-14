@@ -1,0 +1,99 @@
+/* Print CSS für PDF Export */
+
+@media print {
+  @page {
+    size: A4;
+    margin: 10mm 12mm;
+  }
+
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  body {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+    font-size: 11pt !important;
+    line-height: 1.4;
+  }
+
+  .print-report {
+    max-width: 100% !important;
+    padding: 0 !important;
+  }
+
+  /* Seitenumbrüche */
+  h1, h2, h3, h4, h5, h6 {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  /* Bilder nicht zerreißen */
+  img, canvas, svg {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    max-width: 100% !important;
+    height: auto !important;
+  }
+
+  /* Step Cards können umbrechen, aber Bilder nicht */
+  .step-card {
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+
+  /* Tabellen */
+  table {
+    break-inside: auto;
+  }
+  
+  tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  
+  thead {
+    display: table-header-group;
+  }
+
+  /* Buttons und interaktive Elemente verstecken */
+  button, .print-hide {
+    display: none !important;
+  }
+
+
+  /* Text-Wrapping für lange Wörter */
+  p, span, div, li {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+
+  /* Whitespace für pre-formatted Text erhalten */
+  .whitespace-pre-wrap {
+    white-space: pre-wrap;
+  }
+
+  /* Links ohne Unterstreichung */
+  a {
+    text-decoration: none !important;
+    color: inherit !important;
+  }
+
+  /* Schatten entfernen */
+  .shadow, .shadow-sm, .shadow-md, .shadow-lg {
+    box-shadow: none !important;
+  }
+}
+
+/* Screen-only: Spin Animation */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@media screen {
+  .print-only {
+    display: none;
+  }
+}

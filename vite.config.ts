@@ -4,6 +4,9 @@ import path from "node:path";
 import { defineConfig } from "vite";
 
 export default defineConfig({
+  // Relative asset URLs so the app works under any reverse-proxy sub-path.
+  // See DEPLOYMENT.md for the full sub-path story.
+  base: "./",
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {

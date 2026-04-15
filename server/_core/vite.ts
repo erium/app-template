@@ -6,6 +6,22 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import viteConfig from "../../vite.config";
 
+// Resolve base-path for the current request (reverse-proxy sub-path support).
+// Priority: X-Forwarded-Prefix header → BASE_PATH env → "".
+function resolveBasePath(req: { headers: Record<string, unknown> }): string {
+  const header = req.headers["x-forwarded-prefix"];
+  const raw = typeof header === "string" ? header : process.env.BASE_PATH ?? "";
+  return raw.replace(/\/+$/, "");
+}
+
+function injectBaseHref(html: string, basePath: string): string {
+  const href = `${basePath}/`;
+  return html.replace(
+    /<base\s+href="[^"]*"\s*\/?>/i,
+    `<base href="${href}" />`,
+  );
+}
+
 export async function setupVite(app: Express, server: Server) {
   const serverOptions = {
     middlewareMode: true,
@@ -39,7 +55,8 @@ export async function setupVite(app: Express, server: Server) {
         `src="/src/main.tsx?v=${nanoid()}"`
       );
       const page = await vite.transformIndexHtml(url, template);
-      res.status(200).set({ "Content-Type": "text/html" }).end(page);
+      const withBase = injectBaseHref(page, resolveBasePath(req));
+      res.status(200).set({ "Content-Type": "text/html" }).end(withBase);
     } catch (e) {
       vite.ssrFixStacktrace(e as Error);
       next(e);
@@ -60,8 +77,16 @@ export function serveStatic(app: Express) {
 
   app.use(express.static(distPath));
 
-  // fall through to index.html if the file doesn't exist
-  app.use("*", (_req, res) => {
-    res.sendFile(path.resolve(distPath, "index.html"));
+  // fall through to index.html (with injected <base href>) if the file doesn't exist
+  app.use("*", (req, res) => {
+    const indexPath = path.resolve(distPath, "index.html");
+    fs.readFile(indexPath, "utf-8", (err, html) => {
+      if (err) {
+        res.sendFile(indexPath);
+        return;
+      }
+      const withBase = injectBaseHref(html, resolveBasePath(req));
+      res.status(200).set({ "Content-Type": "text/html" }).end(withBase);
+    });
   });
 }

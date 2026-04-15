@@ -1,9 +1,11 @@
 import { useQuery, useMutation, useQueryClient, type UseQueryOptions, type UseMutationOptions } from "@tanstack/react-query";
+import { BASE_PATH } from "./basePath";
 
 // ─── Typed fetch wrapper ───
 
 async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(url, {
+  const fullUrl = url.startsWith("/") ? BASE_PATH + url : url;
+  const res = await fetch(fullUrl, {
     credentials: "include",
     headers: { "Content-Type": "application/json", ...options?.headers },
     ...options,

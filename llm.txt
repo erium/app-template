@@ -130,6 +130,20 @@ router.post("/login", async (req, res) => {
 });
 ```
 
+## Deployment (sub-path / Halerium)
+
+The template is deployable behind a reverse-proxy sub-path (e.g. Halerium mounts apps at `/apps/<org>/<ws>/<AppName>/`). Three layers are already wired — do not duplicate this logic:
+
+- **Assets** — `vite.config.ts` has `base: "./"` (relative URLs resolved against `document.baseURI`).
+- **Client routing** — `client/src/App.tsx` wraps routes in `<Router base={BASE_PATH}>`.
+- **API client** — `client/src/lib/api.ts` prepends `BASE_PATH` to `/api/*` calls.
+
+`BASE_PATH` is resolved in `client/src/lib/basePath.ts`: `VITE_BASE_PATH` env → `<base href>` tag → `""`. The server (`server/_core/vite.ts`) injects the `<base href="${prefix}/">` tag at request time, reading `X-Forwarded-Prefix` or the `BASE_PATH` env var.
+
+**Runner bootstrap:** `start.sh` (at repo root) idempotently upgrades Node to v20, installs pnpm + Postgres, handles stale `postmaster.pid` after ephemeral spin-downs, pushes schema, seeds, builds, and launches. Use runner type **`nano`** on Halerium (`standard` silently fails).
+
+Full detail in `DEPLOYMENT.md`.
+
 ## Anti-Patterns
 
 Never:
@@ -139,6 +153,7 @@ Never:
 - Call `fetch` directly from a component. Go through `client/src/lib/api.ts`.
 - Scatter drizzle queries across route handlers. Put them in `server/db.ts`.
 - Hardcode `APP_NAME`, support email, or copy strings. Use `shared/config.ts` and i18n keys.
+- Assume the app is served from `/`. Use `BASE_PATH` / `getApiBase()` from `client/src/lib/basePath.ts` for client-side URL construction.
 - Commit `.env`, `pg-data/`, `uploads/`, `data/`, `dist/`.
 - Skip git hooks with `--no-verify`.
 - Use `any`, `console.log` in committed code, or browser `alert`.
@@ -149,6 +164,7 @@ Full list in `CONVENTIONS.md`.
 
 - **[`CONVENTIONS.md`](./CONVENTIONS.md)** — complete coding standards, naming, file layout, testing.
 - **[`ARCHITECTURE.md`](./ARCHITECTURE.md)** — system overview with ASCII diagrams.
+- **[`DEPLOYMENT.md`](./DEPLOYMENT.md)** — Halerium runner, proxy sub-path config, ephemeral DB bootstrap.
 - **[`README.md`](./README.md)** — human-oriented quick start and customization.
 - **[`docs/architecture-logical.md`](./docs/architecture-logical.md)** — runtime view and sequence diagrams (mermaid).
 - **[`docs/architecture-development.md`](./docs/architecture-development.md)** — build pipeline and code organization.

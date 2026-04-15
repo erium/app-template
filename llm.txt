@@ -21,6 +21,7 @@ A generic full-stack TypeScript template: React frontend + Express REST backend 
 - **Runtime:** Node 20+, pnpm 10
 - **Frontend:** React 19, Vite 7, wouter 3 (routing), TailwindCSS 4, shadcn/ui, react-hook-form 7, react-i18next 16, @tanstack/react-query 5, sonner (toasts)
 - **Backend:** Express 4, drizzle-orm 0.44 + pg 8 (PostgreSQL), jose 6 (JWT), bcryptjs 3, zod 4, nodemailer 8, stripe 20, playwright 1.58
+- **AI:** Vercel AI SDK 4 (`ai`, `@ai-sdk/openai`, `@ai-sdk/react`) — example route at `/api/chat`, example UI at `/chat-example`
 - **TypeScript:** 5.9, strict mode
 
 ## Commands
@@ -159,6 +160,26 @@ The template is deployable behind a reverse-proxy sub-path (e.g. Halerium mounts
 Use runner type **`nano`** on Halerium (`standard` silently fails).
 
 Full detail in `DEPLOYMENT.md`.
+
+## How to Add AI Chat to Your App
+
+The template ships with a Vercel AI SDK example at `/chat-example` (requires login). Use it as the starting point for any LLM-powered feature.
+
+**Env vars** (add to `.env` — all optional; endpoint returns 503 without a key):
+
+```
+OPENAI_API_KEY=sk-...
+OPENAI_BASE_URL=https://api.openai.com/v1   # override for OpenAI-compatible endpoints
+OPENAI_MODEL=gpt-4o-mini
+```
+
+`OPENAI_BASE_URL` lets you swap in Azure OpenAI, OpenRouter, vLLM, or a local Ollama (via its OpenAI-compat shim) without code changes.
+
+**Server — `server/routes/chat.ts`** — `requireAuth` router, zod-validates `{ messages }`, pipes `streamText(...).pipeDataStreamToResponse(res)`. Swap providers by installing `@ai-sdk/anthropic` (or similar) and replacing `openai(model)` with `anthropic(model)`.
+
+**Client — `client/src/components/chat/ChatExample.tsx`** — uses `useChat` from `@ai-sdk/react` with `api: \`${getApiBase()}/chat\`` and `credentials: "include"`. The `getApiBase()` call is required — hard-coding `/api/chat` breaks sub-path deployments.
+
+**To add a new AI feature**: copy `chat.ts`, adjust the system prompt / messages shape, register it in `server/routes/index.ts`, and build a UI using `useChat` (chat) or `useCompletion` (single-turn) pointed at the new endpoint.
 
 ## Anti-Patterns
 

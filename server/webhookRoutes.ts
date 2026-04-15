@@ -2,6 +2,7 @@ import express from "express";
 import { stripe } from "./stripe";
 import * as db from "./db";
 import getRawBody from "raw-body";
+import { logger } from "./utils/logger";
 
 const router = express.Router();
 
@@ -20,7 +21,7 @@ router.post("/api/webhook/stripe", async (req, res) => {
     event = stripe.webhooks.constructEvent(rawBody, signature, secret);
   } catch (err) {
     const errMessage = err instanceof Error ? err.message : String(err);
-    console.error("Webhook signature verification failed:", errMessage);
+    logger.error({ err }, "Webhook signature verification failed");
     res.status(400).send(`Webhook Error: ${errMessage}`);
     return;
   }
@@ -38,7 +39,7 @@ router.post("/api/webhook/stripe", async (req, res) => {
         // Check for duplicate transaction (idempotency)
         const existing = await db.getTransactionByStripeSessionId(session.id);
         if (existing) {
-          console.log(`[Webhook] Transaction ${session.id} already processed, skipping.`);
+          logger.info({ sessionId: session.id }, "[Webhook] Transaction already processed, skipping");
           res.json({ received: true });
           return;
         }
@@ -54,12 +55,12 @@ router.post("/api/webhook/stripe", async (req, res) => {
         const user = await db.getUserById(userId);
         if (user) {
           await db.addTenantCredits(user.tenantId, creditsToAdd);
-          console.log(`[Webhook] Updated credits for tenant ${user.tenantId} (user ${userId}): +${creditsToAdd}`);
+          logger.info({ tenantId: user.tenantId, userId, creditsToAdd }, "[Webhook] Updated credits for tenant");
         } else {
-          console.error(`[Webhook] User ${userId} not found, could not credit tenant.`);
+          logger.error({ userId }, "[Webhook] User not found, could not credit tenant");
         }
       } catch (error) {
-        console.error("[Webhook] Failed to update credits:", error);
+        logger.error({ err: error }, "[Webhook] Failed to update credits");
         res.status(500).send("Internal Server Error");
         return;
       }

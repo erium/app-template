@@ -6,6 +6,7 @@ import { getSessionCookieOptions } from "../_core/cookies";
 import * as db from "../db";
 import { sendInvitationEmail } from "../email";
 import { requireAuth, requireAdmin } from "../middleware/auth";
+import { logger } from "../utils/logger";
 
 const router = Router();
 
@@ -22,7 +23,7 @@ router.get("/settings", async (req: Request, res: Response) => {
     }
     res.json({ name: tenant.name });
   } catch (err) {
-    console.error("[Tenant] getSettings error:", err);
+    logger.error({ err }, "[Tenant] getSettings error:");
     res.status(500).json({ error: "Interner Serverfehler" });
   }
 });
@@ -40,7 +41,7 @@ router.put("/name", requireAdmin, async (req: Request, res: Response) => {
     await db.updateTenantName(req.user!.tenantId, parsed.data.name);
     res.json({ success: true });
   } catch (err) {
-    console.error("[Tenant] updateName error:", err);
+    logger.error({ err }, "[Tenant] updateName error:");
     res.status(500).json({ error: "Interner Serverfehler" });
   }
 });
@@ -51,7 +52,7 @@ router.get("/users", requireAdmin, async (req: Request, res: Response) => {
     const result = await db.getUsers(req.user!.tenantId);
     res.json(result);
   } catch (err) {
-    console.error("[Tenant] getUsers error:", err);
+    logger.error({ err }, "[Tenant] getUsers error:");
     res.status(500).json({ error: "Interner Serverfehler" });
   }
 });
@@ -91,12 +92,12 @@ router.post("/invite", requireAdmin, async (req: Request, res: Response) => {
       createdAt: new Date(),
     });
 
-    console.log(`[INVITE LINK] /join?token=${token}`);
+    logger.info({ token }, "[Tenant] Invite link generated");
     await sendInvitationEmail(input.email, token);
 
     res.json({ success: true, token });
   } catch (err) {
-    console.error("[Tenant] inviteUser error:", err);
+    logger.error({ err }, "[Tenant] inviteUser error:");
     res.status(500).json({ error: "Interner Serverfehler" });
   }
 });
@@ -127,7 +128,7 @@ router.put(
       );
       res.json(result);
     } catch (err) {
-      console.error("[Tenant] updateUserRole error:", err);
+      logger.error({ err }, "[Tenant] updateUserRole error:");
       res.status(500).json({ error: "Interner Serverfehler" });
     }
   },
@@ -139,7 +140,7 @@ router.get("/invites", requireAdmin, async (req: Request, res: Response) => {
     const result = await db.getPendingInvitations(req.user!.tenantId);
     res.json(result);
   } catch (err) {
-    console.error("[Tenant] getPendingInvites error:", err);
+    logger.error({ err }, "[Tenant] getPendingInvites error:");
     res.status(500).json({ error: "Interner Serverfehler" });
   }
 });
@@ -159,7 +160,7 @@ router.delete(
       await db.deleteInvitationForTenant(idParsed.data, req.user!.tenantId);
       res.json({ success: true });
     } catch (err) {
-      console.error("[Tenant] revokeInvitation error:", err);
+      logger.error({ err }, "[Tenant] revokeInvitation error:");
       res.status(500).json({ error: "Interner Serverfehler" });
     }
   },
@@ -190,7 +191,7 @@ router.post(
       await sendInvitationEmail(invite.email, invite.token);
       res.json({ token: invite.token });
     } catch (err) {
-      console.error("[Tenant] resendInvitation error:", err);
+      logger.error({ err }, "[Tenant] resendInvitation error:");
       res.status(500).json({ error: "Interner Serverfehler" });
     }
   },
@@ -220,7 +221,7 @@ router.delete(
       await db.deleteUserByIdForTenant(userId, req.user!.tenantId);
       res.json({ success: true });
     } catch (err) {
-      console.error("[Tenant] deleteUser error:", err);
+      logger.error({ err }, "[Tenant] deleteUser error:");
       res.status(500).json({ error: "Interner Serverfehler" });
     }
   },
@@ -231,7 +232,7 @@ router.delete("/", requireAdmin, async (req: Request, res: Response) => {
   try {
     // Fire and forget - run in background to prevent timeout
     db.deleteTenantFull(req.user!.tenantId).catch((err) => {
-      console.error("Background tenant deletion failed:", err);
+      logger.error({ err }, "Background tenant deletion failed");
     });
 
     const cookieOptions = getSessionCookieOptions(req);
@@ -239,7 +240,7 @@ router.delete("/", requireAdmin, async (req: Request, res: Response) => {
 
     res.json({ success: true });
   } catch (err) {
-    console.error("[Tenant] delete error:", err);
+    logger.error({ err }, "[Tenant] delete error:");
     res.status(500).json({ error: "Interner Serverfehler" });
   }
 });

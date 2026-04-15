@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import { authService } from "../_core/auth";
+import { logger } from "../utils/logger";
 
 // Extend Express Request to carry the authenticated user
 declare global {
@@ -33,7 +34,7 @@ export async function authenticateUser(
       req.user = user as Express.Request["user"];
     }
   } catch (err) {
-    console.error("[Auth Middleware] Error authenticating request:", err);
+    logger.error({ err }, "[Auth Middleware] Error authenticating request");
   }
   next();
 }

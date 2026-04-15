@@ -3,6 +3,7 @@
 import path from "path";
 import fs from "fs";
 import { nanoid } from "nanoid";
+import { logger } from "./utils/logger";
 
 const UPLOAD_DIR = path.join(process.cwd(), "uploads");
 
@@ -32,7 +33,7 @@ export async function storagePut(
     const url = `/uploads/${filename}`;
     return { key: relKey, url };
   } catch (error) {
-    console.error("[Storage] Upload failed:", error);
+    logger.error({ err: error }, "[Storage] Upload failed");
     throw error;
   }
 }
@@ -51,6 +52,6 @@ export function deleteStorageFile(filename: string): void {
       fs.unlinkSync(filepath);
     }
   } catch (error) {
-    console.error("[Storage] Delete failed:", error);
+    logger.error({ err: error }, "[Storage] Delete failed");
   }
 }

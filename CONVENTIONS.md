@@ -127,6 +127,15 @@ Never check roles inside a handler if middleware can enforce it.
 - Never hardcode the app name, support email, or domain URLs anywhere else.
 - Secrets live in `.env`. `.env.example` documents every variable.
 
+## Logging
+
+- Server code uses `logger` from `server/utils/logger.ts` (pino). Never use `console.*` on the server.
+- Call sites: `logger.info("message")`, `logger.warn({ key: value }, "message")`, `logger.error({ err }, "message")`. Passing errors as `{ err }` preserves stack traces.
+- HTTP access logs are emitted automatically by `pino-http` — you don't need to log requests manually.
+- Files land in `<pkg-name>_logs/` at the repo root: `app.log` (all levels) and `error.log` (errors). `pino-roll` rotates daily / at 10 MB.
+- Levels: dev defaults to `debug`, prod to `info`. Override with `LOG_LEVEL` in `.env` (e.g. `LOG_LEVEL=trace`).
+- `<pkg-name>` is derived from `package.json`'s `name` field.
+
 ## Testing
 
 - Framework: `vitest`. Run with `pnpm test`.
@@ -158,8 +167,8 @@ Do not:
 - Add `axios`. Use `fetch` via `api.ts`.
 - Scatter DB queries across route handlers. Put them in `server/db.ts`.
 - Hardcode copy. Use i18n keys.
-- Commit `.env`, `pg-data/`, `uploads/`, `data/`, or `dist/`.
+- Commit `.env`, `pg-data/`, `uploads/`, `data/`, `dist/`, or `*_logs/`.
 - Skip pre-commit hooks with `--no-verify`.
 - Add backwards-compat shims for code that doesn't exist yet.
-- Leave `console.log` in committed code (except startup banners).
+- Use `console.log/warn/error` in server code. Import `logger` from `server/utils/logger.ts` instead.
 - Write multi-paragraph doc comments — the code should speak for itself.

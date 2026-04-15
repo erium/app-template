@@ -1,5 +1,5 @@
 import "dotenv/config";
-import express from "express";
+import express, { type NextFunction, type Request, type Response } from "express";
 import { createServer } from "http";
 import net from "net";
 import { registerUploadRoutes } from "../uploadRoutes";
@@ -7,6 +7,7 @@ import apiRoutes from "../routes/index";
 import { authenticateUser } from "../middleware/auth";
 import { serveStatic, setupVite } from "./vite";
 import { webhookRouter } from "../webhookRoutes";
+import { httpLogger, logger } from "../utils/logger";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -29,7 +30,7 @@ async function findAvailablePort(startPort: number = 8497): Promise<number> {
 
 function getPortFromArgs(): number | null {
   const args = process.argv.slice(2);
-  
+
   if (args.length > 0 && !isNaN(parseInt(args[0], 10)) && !args[0].startsWith('-')) {
     return parseInt(args[0], 10);
   }
@@ -39,13 +40,13 @@ function getPortFromArgs(): number | null {
     const port = parseInt(args[portIndex + 1], 10);
     if (!isNaN(port)) return port;
   }
-  
+
   const portArg = args.find(arg => arg.startsWith('--port='));
   if (portArg) {
     const port = parseInt(portArg.split('=')[1], 10);
     if (!isNaN(port)) return port;
   }
-  
+
   return null;
 }
 
@@ -62,18 +63,28 @@ async function startServer() {
 
   registerUploadRoutes(app);
 
+  // Structured HTTP access log (pino-http). Attaches req.log and logs every response.
+  app.use(httpLogger);
+
   // Authenticate all requests (populates req.user if session cookie is valid)
   app.use(authenticateUser);
 
   // REST API routes
   app.use(apiRoutes);
-  
+
   // development mode uses Vite, production mode uses static files
   if (process.env.NODE_ENV === "development") {
     await setupVite(app, server);
   } else {
     serveStatic(app);
   }
+
+  // Global error handler — last in the chain so unhandled errors always land in error.log
+  app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
+    (req.log ?? logger).error({ err }, "Unhandled request error");
+    if (res.headersSent) return;
+    res.status(500).json({ error: "Internal server error" });
+  });
 
   const argsPort = getPortFromArgs();
   const envPort = parseInt(process.env.PORT || "8497");
@@ -82,12 +93,12 @@ async function startServer() {
   const port = await findAvailablePort(preferredPort);
 
   if (port !== preferredPort) {
-    console.log(`Port ${preferredPort} is busy, using port ${port} instead`);
+    logger.info({ preferredPort, port }, `Port ${preferredPort} is busy, using port ${port} instead`);
   }
 
   server.listen(port, () => {
-    console.log(`Server running on http://localhost:${port}/`);
+    logger.info({ port }, `Server running on http://localhost:${port}/`);
   });
 }
 
-startServer().catch(console.error);
+startServer().catch((err) => logger.error({ err }, "Fatal startup error"));

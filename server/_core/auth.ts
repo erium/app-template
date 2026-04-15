@@ -3,6 +3,7 @@ import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import type { Request } from "express";
 import { parse as parseCookieHeader } from "cookie";
 import * as db from "../db";
+import { logger } from "../utils/logger";
 import { ENV } from "./env";
 
 export type SessionPayload = {
@@ -23,7 +24,7 @@ class LocalAuthService {
     const expirationSeconds = Math.floor((issuedAt + ONE_YEAR_MS) / 1000);
     const secretKey = this.getSessionSecret();
     
-    console.log(`[Auth] Creating token for user ${userId} (${email}) Tenant: ${tenantId}`);
+    logger.debug({ userId, email, tenantId }, "[Auth] Creating session token");
 
     return new SignJWT({
       userId,
@@ -37,7 +38,6 @@ class LocalAuthService {
 
   async verifySession(cookieValue: string | undefined | null): Promise<SessionPayload | null> {
     if (!cookieValue) {
-      // console.warn("[Auth] Verify: Missing session cookie value");
       return null;
     }
 
@@ -50,14 +50,13 @@ class LocalAuthService {
       const { userId, email, tenantId } = payload as Record<string, unknown>;
 
       if (typeof userId !== "number" || typeof email !== "string" || typeof tenantId !== "number") {
-        console.warn("[Auth] Session payload missing required fields");
+        logger.warn("[Auth] Session payload missing required fields");
         return null;
       }
-      
-      // console.log(`[Auth] Verified session for user ${userId}`);
+
       return { userId, email, tenantId };
     } catch (error) {
-      console.warn("[Auth] Session verification failed", String(error));
+      logger.warn({ err: error }, "[Auth] Session verification failed");
       return null;
     }
   }
@@ -71,13 +70,10 @@ class LocalAuthService {
   }
 
   async authenticateRequest(req: Request) {
-    // console.log(`[Auth] Authenticating request to ${req.url}`);
-    
     const cookies = this.parseCookies(req.headers.cookie);
     const sessionCookie = cookies.get(COOKIE_NAME);
-    
+
     if (!sessionCookie) {
-        // console.log(`[Auth] No '${COOKIE_NAME}' cookie found.`);
         return null;
     }
 
@@ -90,18 +86,18 @@ class LocalAuthService {
     // We fetch the user to ensure they still exist and have access
     const user = await db.getUserById(session.userId);
     if (!user) {
-      console.warn(`[Auth] User ${session.userId} from valid token not found in DB`);
+      logger.warn({ userId: session.userId }, "[Auth] User from valid token not found in DB");
       return null;
     }
 
     // Security check: Ensure token tenant matches user tenant
     if (user.tenantId !== session.tenantId) {
-        console.warn(`[Auth] Tenant mismatch for user ${user.id}. Token: ${session.tenantId}, DB: ${user.tenantId}`);
+        logger.warn({ userId: user.id, tokenTenantId: session.tenantId, dbTenantId: user.tenantId }, "[Auth] Tenant mismatch");
         return null;
     }
 
     // Update last signed in (async, don't await to block)
-    db.updateUserLastSignedIn(user.id).catch(err => console.error("Failed to update last login", err));
+    db.updateUserLastSignedIn(user.id).catch((err) => logger.error({ err }, "Failed to update last login"));
 
     return user;
   }

@@ -38,6 +38,7 @@ server/
   _core/          entry point, env, cookies, vite dev middleware
   middleware/     auth.ts: authenticateUser, requireAuth, requireAdmin
   routes/         Express routers per resource (auth, tenant, payment, export)
+  utils/          logger.ts (pino) — use this, not console
   db.ts           ALL drizzle queries go here
   email.ts, stripe.ts, pdfExport.ts, webhookRoutes.ts
 drizzle/
@@ -139,7 +140,8 @@ Never:
 - Call `fetch` directly from a component. Go through `client/src/lib/api.ts`.
 - Scatter drizzle queries across route handlers. Put them in `server/db.ts`.
 - Hardcode `APP_NAME`, support email, or copy strings. Use `shared/config.ts` and i18n keys.
-- Commit `.env`, `pg-data/`, `uploads/`, `data/`, `dist/`.
+- Use `console.log/error/warn` in server code. Import `logger` from `server/utils/logger.ts` and use `logger.info/warn/error/debug`. Pass errors as `logger.error({ err }, "message")`. Logs land in `<pkg-name>_logs/app.log` (all levels) and `error.log` (errors). Dev defaults to `debug`, prod to `info`; override with `LOG_LEVEL`.
+- Commit `.env`, `pg-data/`, `uploads/`, `data/`, `dist/`, `*_logs/`.
 - Skip git hooks with `--no-verify`.
 - Use `any`, `console.log` in committed code, or browser `alert`.
 

@@ -1,4 +1,13 @@
 {
+  "chat_title": "KI-Chat",
+  "chat_subtitle": "Beispiel-Chat-Oberfläche auf Basis des Vercel AI SDK.",
+  "chat_placeholder": "Nachricht eingeben…",
+  "chat_send": "Senden",
+  "chat_empty": "Starte das Gespräch mit einer Nachricht.",
+  "chat_role_user": "Du",
+  "chat_role_assistant": "Assistent",
+  "chat_error_not_configured": "KI-Chat ist nicht konfiguriert. Setze OPENAI_API_KEY in deiner .env.",
+  "chat_error_generic": "Etwas ist schiefgelaufen. Bitte versuche es erneut.",
   "settings": "Einstellungen",
   "profile": "Profil",
   "language": "Sprache",

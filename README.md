@@ -11,6 +11,7 @@ Clone it, rename it, build your app on top.
 - **i18n** — `react-i18next` with English + German, auto language detection.
 - **Stripe billing** — Checkout session creation, webhook-based fulfillment, transaction history.
 - **PDF export** — Playwright-based HTML → PDF REST endpoint.
+- **AI chat** — Vercel AI SDK streaming example at `/chat-example`, OpenAI-compatible (swap `OPENAI_BASE_URL` for Azure / OpenRouter / local).
 - **Email** — Nodemailer with SMTP (logs to console if unconfigured).
 - **UI** — shadcn/ui (53 components) on TailwindCSS 4, Radix primitives, dark-mode ready.
 - **Type-safe API** — Express REST with zod validation and a typed `fetch` wrapper on the client.

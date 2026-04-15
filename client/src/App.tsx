@@ -16,6 +16,7 @@ import AdminUsers from "./pages/AdminUsers";
 import Settings from "./pages/Settings";
 import Billing from "./pages/Billing";
 import VerifyEmail from "./pages/VerifyEmail";
+import ChatExample from "./pages/ChatExample";
 
 function Routes() {
   return (
@@ -30,6 +31,7 @@ function Routes() {
       <Route path="/register" component={Register} />
       <Route path="/join" component={Join} />
       <Route path="/verify" component={VerifyEmail} />
+      <Route path="/chat-example" component={ChatExample} />
 
       {/* Admin Routes */}
       <Route path="/admin/users" component={AdminUsers} />

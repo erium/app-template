@@ -25,6 +25,9 @@ Clone it, rename it, build your app on top.
 ## Quick Start
 
 ```bash
+# 0. Detach from the template repo so you don't accidentally push upstream
+bash detach.sh
+
 # 1. Install dependencies
 pnpm install
 

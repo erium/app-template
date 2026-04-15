@@ -2,6 +2,16 @@
 
 A dense brief for AI coding agents working in this repo. Read this first. For full detail, see `CONVENTIONS.md` (coding standards) and `README.md` (quick start).
 
+## First Step: Detach From the Template Repo
+
+**Before you touch anything else, run `bash detach.sh`.** The template is cloned from `erium/app-template`; leaving that remote attached risks accidentally pushing an app's work back upstream. The script is idempotent:
+
+- If `origin` points at `erium/app-template`, it wipes `.git/` and runs `git init` + initial commit so your new project has a clean history.
+- If there is no `.git/`, it initializes one.
+- If `origin` is anything else (or missing), it exits without changes.
+
+After detaching, add your own remote with `git remote add origin <your-repo-url>`. Do not push before running this script.
+
 ## What This Is
 
 A generic full-stack TypeScript template: React frontend + Express REST backend + PostgreSQL via Drizzle ORM. Ships with auth, multi-tenancy (tenant → users → invitations), i18n (de/en), Stripe billing, PDF export (Playwright), and 53 shadcn/ui components. Single `package.json` (no monorepo). Branding lives in `shared/config.ts`.

@@ -97,8 +97,9 @@ To add a new feature end-to-end:
 3. **API route** — create `server/routes/<resource>.ts` exporting an Express `Router`. Validate body with zod. Register in `server/routes/index.ts`.
 4. **API client method** — add a typed entry to `client/src/lib/api.ts`. Add its query key to `queryKeys` if used with react-query.
 5. **Page or component** — create in `client/src/pages/` or `client/src/components/`. Fetch via `useQuery({ queryFn: api.<method> })`. Wire it into `client/src/App.tsx` if it's a page.
-6. **i18n** — add every user-facing string as a key in `client/src/locales/de/common.json` AND `en/common.json`. Use `const { t } = useTranslation(); t("key")`.
-7. **Verify** — `pnpm check` (types), `pnpm lint`, manual test at `http://localhost:8497`.
+6. **Sidebar entry (if it's a page users navigate to)** — add an item to `menuGroups` in `client/src/components/DashboardLayout.tsx`: `{ icon, label: "<i18n_key>", path: "/your-page", roles?: ["admin"] }`. Skip this step if the page is intentionally opt-in by URL only.
+7. **i18n** — add every user-facing string as a key in `client/src/locales/de/common.json` AND `en/common.json`. Use `const { t } = useTranslation(); t("key")`. The sidebar `label` is an i18n key, not a literal string.
+8. **Verify** — `pnpm check` (types), `pnpm lint`, manual test at `http://localhost:8497`.
 
 ## Quick Patterns
 
@@ -163,7 +164,7 @@ Full detail in `DEPLOYMENT.md`.
 
 ## How to Add AI Chat to Your App
 
-The template ships with a Vercel AI SDK example at `/chat-example` (requires login). Use it as the starting point for any LLM-powered feature.
+The template ships with a Vercel AI SDK example at `/chat-example` (requires login, linked from the sidebar as "AI Chat"). Use it as the starting point for any LLM-powered feature.
 
 **Env vars** (add to `.env` — all optional; endpoint returns 503 without a key):
 

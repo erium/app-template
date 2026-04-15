@@ -5,7 +5,9 @@ Short, agent-oriented brief for deploying this template to Halerium. For local d
 ## TL;DR
 
 - Runner type: **`nano`**. `standard` silently fails on this environment.
-- Launch with: `bash start.sh [PORT]` — it bootstraps Node, pnpm, Postgres, and the schema on every boot.
+- Launch production: `bash start.sh [PORT]` — bootstraps Node, pnpm, Postgres, schema, builds, runs `pnpm start`.
+- Launch dev (HMR): `bash start.sh --dev [PORT]` — same bootstrap, then `pnpm dev` (Vite + tsx watch).
+- `start.sh` launches the app via `package.json` scripts only (`pnpm start` / `pnpm dev`). Do not invoke `node dist/index.js` directly.
 - Reverse-proxy sub-path is already wired end-to-end. You don't need to touch `vite.config.ts`, wouter, or `api.ts`.
 - Halerium runners are **ephemeral** (spin down after ~10 min idle). The filesystem persists, daemons do not. `start.sh` handles that.
 
@@ -60,8 +62,10 @@ On every runner boot the script performs, idempotently:
 5. Removes stale `pg-data/postmaster.pid` if the PID is gone (the daemon died with the previous spin-down).
 6. Starts the daemon, creates the `app` role and `app_db` database.
 7. `pnpm install` (if `node_modules` missing), `pnpm db:push`, `pnpm db:seed`.
-8. Builds if `dist/` is missing.
-9. `NODE_ENV=production node dist/index.js $PORT`.
+8. **Prod mode** (default): `pnpm build` if `dist/` is missing, then `pnpm start`.
+   **Dev mode** (`--dev`): skip build, `pnpm dev` for HMR + tsx watch.
+
+`PORT` is exported to the environment so both `pnpm dev` and `pnpm start` pick it up (the server reads `process.env.PORT`). Use dev mode while iterating; prod mode for deploys and verification.
 
 `setup-postgres.sh` is the **local** installer for dev machines. On runners, use `start.sh`.
 

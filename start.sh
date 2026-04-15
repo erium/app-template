@@ -3,10 +3,19 @@
 # Handles: Node upgrade, pnpm install, Postgres install + daemon, stale PID cleanup,
 # schema push, seed, build, and launch.
 #
-# Usage: bash start.sh [PORT]      # defaults to 8497
-# See DEPLOYMENT.md for environment assumptions and runner-type guidance.
+# Usage:
+#   bash start.sh [PORT]          # production: pnpm build (if needed) + pnpm start
+#   bash start.sh --dev [PORT]    # development: pnpm dev (Vite + tsx watch, HMR)
+#
+# PORT defaults to 8497. See DEPLOYMENT.md for runner-type and environment notes.
 
 set -e
+
+MODE="prod"
+if [ "$1" = "--dev" ] || [ "$1" = "-d" ]; then
+  MODE="dev"
+  shift
+fi
 
 APP_DIR="${APP_DIR:-$(cd "$(dirname "$0")" && pwd)}"
 cd "$APP_DIR"
@@ -98,13 +107,18 @@ pnpm db:push 2>&1 || true
 echo "Seeding..."
 pnpm db:seed 2>&1 || true
 
-# 8. Build if not already built
+# 8. Run — always via package.json scripts
+export PORT="${1:-8497}"
+
+if [ "$MODE" = "dev" ]; then
+  echo "=== App starting (dev) on port $PORT ==="
+  exec pnpm dev
+fi
+
 if [ ! -f dist/index.js ] || [ ! -d dist/public ]; then
   echo "Building..."
   NODE_OPTIONS="--max-old-space-size=768" pnpm build 2>&1
 fi
 
-# 9. Run
-PORT="${1:-8497}"
-echo "=== App starting on port $PORT ==="
-NODE_ENV=production exec node dist/index.js "$PORT"
+echo "=== App starting (prod) on port $PORT ==="
+exec pnpm start

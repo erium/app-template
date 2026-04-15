@@ -140,7 +140,12 @@ The template is deployable behind a reverse-proxy sub-path (e.g. Halerium mounts
 
 `BASE_PATH` is resolved in `client/src/lib/basePath.ts`: `VITE_BASE_PATH` env → `<base href>` tag → `""`. The server (`server/_core/vite.ts`) injects the `<base href="${prefix}/">` tag at request time, reading `X-Forwarded-Prefix` or the `BASE_PATH` env var.
 
-**Runner bootstrap:** `start.sh` (at repo root) idempotently upgrades Node to v20, installs pnpm + Postgres, handles stale `postmaster.pid` after ephemeral spin-downs, pushes schema, seeds, builds, and launches. Use runner type **`nano`** on Halerium (`standard` silently fails).
+**Runner bootstrap:** `start.sh` (at repo root) idempotently upgrades Node to v20, installs pnpm + Postgres, handles stale `postmaster.pid` after ephemeral spin-downs, pushes schema, seeds, and launches via package.json scripts only:
+
+- `bash start.sh [PORT]` — prod: builds if needed, runs `pnpm start`.
+- `bash start.sh --dev [PORT]` — dev: runs `pnpm dev` (Vite + tsx watch, HMR). Use this while iterating.
+
+Use runner type **`nano`** on Halerium (`standard` silently fails).
 
 Full detail in `DEPLOYMENT.md`.
 

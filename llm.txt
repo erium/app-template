@@ -40,35 +40,37 @@ PostgreSQL setup: `bash setup-postgres.sh` (apt-installs locally, not Docker). U
 
 ## Build & Run
 
-### Development (iterating / debugging)
+The app lifecycle is managed via the Control App functions (`create_app`, `start_app`, `stop_app`, `update_app`). When creating or starting the app, set `working_directory` to the project root and `start_commands` to one of:
 
-```bash
-pnpm dev                         # Vite HMR + tsx watch, pino-pretty to console
-# or on a runner:
-bash start.sh --dev [PORT]       # same, but bootstraps Node/pnpm/Postgres first
-```
+| Mode | `start_commands` | When to use |
+|---|---|---|
+| **Dev** | `bash start.sh --dev PORT` | While developing and debugging. Logs every request at `debug` level. |
+| **Prod** | `bash start.sh PORT` | Final deployment. Builds automatically, logs at `info` level. |
 
-1. Run the command above. Wait until the terminal shows `Server running on http://localhost:8497/`.
-2. Open the URL in a browser — verify the page loads and you can log in.
-3. Watch the terminal: every request and every error appears in real-time (pino-pretty at `debug` level).
+`start.sh` handles the full bootstrap (Node upgrade, pnpm, Postgres, migrations, seed, build) — you don't need to run these steps separately.
 
-Use dev mode while iterating. Switch to production mode only for final deployment.
+**Use dev mode (`--dev`) while iterating.** It gives you richer logs (pino-pretty, debug level) that make errors much easier to find. Only switch to prod mode for the final deployment.
 
-### Production (deploying)
+### After Starting — Verify (mandatory)
 
-```bash
-pnpm build                       # Vite client build + esbuild server bundle
-pnpm start                       # serve the built app
-# or on a runner (handles everything):
-bash start.sh [PORT]
-```
+**Do not assume the app works. Verify every time you start it:**
 
-1. `pnpm build` — **read the output.** If it shows errors, fix them before continuing.
-2. `pnpm start` (or `bash start.sh [PORT]` on runners — it builds automatically if `dist/` is missing).
-3. Verify: `curl http://localhost:PORT/api/health` → `{"status":"ok"}`.
-4. Open the app in a browser. If you see a blank page or a MIME-type error ("expected JavaScript, got text/html"), the build is missing or stale — re-run `pnpm build`.
+1. **Read `app-startup.log`** (in the project root) — confirm bootstrap completed without errors (Node, Postgres, migrations, build, seed).
+2. **Check the health endpoint** — `curl http://localhost:PORT/api/health` → `{"status":"ok"}`. If this fails, the server didn't start — read the logs.
+3. **Open the app in the browser** — verify the page loads and you can log in. If you see a blank page or a MIME-type error ("expected JavaScript, got text/html"), the build is missing or stale.
+4. **If something fails, read the logs before making code changes.** The fix is usually visible in the error output. Do not guess.
 
-**Never run `pnpm start` without building first** — it serves from `dist/`, which won't exist until you build.
+### Debugging Workflow
+
+When the app fails or misbehaves after starting:
+
+1. **Stop the app** (via `stop_app`).
+2. **Read the logs** — check `app-startup.log`, `<pkg-name>_logs/error.log`, and `pg-data/pg.log` (see Log Files below).
+3. **Ensure you are running in dev mode** (`bash start.sh --dev PORT` in `start_commands`) — dev mode logs every request and error at `debug` level.
+4. **Start the app** (via `start_app`), open it in the browser, trigger the failing action, and read the log output.
+5. **Fix and restart** — make the code change, then stop → start → verify again.
+
+**Never claim the app is fixed without going through this cycle.**
 
 ### Log Files
 

@@ -81,8 +81,15 @@ if [ -f "$PG_DATA/postmaster.pid" ]; then
   fi
 fi
 
-# Avoid conflicts with a system Postgres on the same port
+# Avoid conflicts with a system Postgres on the same port.
+# apt-get install postgresql auto-starts the system cluster — stop it and wait
+# for port 5432 to be released before starting our local instance.
 sudo systemctl stop postgresql 2>/dev/null || true
+sudo pg_ctlcluster 14 main stop 2>/dev/null || true
+for i in $(seq 1 10); do
+  ss -tlnp 2>/dev/null | grep -q ":5432 " || break
+  sleep 1
+done
 
 if ! "$PG_BIN/pg_ctl" -D "$PG_DATA" status >/dev/null 2>&1; then
   echo "Starting PostgreSQL..."

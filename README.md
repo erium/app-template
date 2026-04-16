@@ -148,6 +148,17 @@ This repo uses local PostgreSQL installed via `setup-postgres.sh`, not Docker �
 
 If you want to use an existing PostgreSQL instance, skip the script and set `DATABASE_URL` in `.env` accordingly.
 
+### Stopping the Dev Server
+
+`pnpm dev` (and `bash start.sh --dev`) may leave orphaned Node processes after Ctrl+C because pnpm doesn't forward signals to its full child tree. If the port stays busy after stopping:
+
+```bash
+# Find and kill whatever holds the port
+sudo lsof -i :8497 -t | xargs kill
+```
+
+This is a local dev issue only — on Halerium runners, `stop_app` kills the entire process tree cleanly.
+
 ## License
 
 MIT — see [`LICENSE`](./LICENSE) if present, otherwise refer to the license field in `package.json`.

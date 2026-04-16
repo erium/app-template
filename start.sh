@@ -20,51 +20,55 @@ fi
 APP_DIR="${APP_DIR:-$(cd "$(dirname "$0")" && pwd)}"
 cd "$APP_DIR"
 
+# Bootstrap output goes to app-startup.log (read by bots to diagnose failures).
+# No tee — avoids orphaned subprocesses that survive Ctrl+C / stop_app.
+# The server's own runtime output is handled by pino (→ <pkg>_logs/).
 LOG="${APP_DIR}/app-startup.log"
-exec > >(tee -a "$LOG") 2>&1
+log() { echo "$@" >> "$LOG"; echo "$@"; }
 
-echo "=== App Startup ==="
-echo "Date: $(date)"
-echo "Dir:  $APP_DIR"
+: > "$LOG"
+log "=== App Startup ==="
+log "Date: $(date)"
+log "Dir:  $APP_DIR"
 
 # 1. Node >= 20 (Halerium runners ship v17).
 NODE_VER=$(node --version 2>/dev/null || echo "none")
-echo "Current Node: $NODE_VER"
+log "Current Node: $NODE_VER"
 if [[ "$NODE_VER" < "v20" ]]; then
-  echo "Upgrading Node to v20..."
+  log "Upgrading Node to v20..."
   npm install -g n 2>&1 | tail -1
   sudo n 20 2>&1 | tail -3
   hash -r 2>/dev/null || true
   export PATH="/usr/local/bin:$PATH"
-  echo "Node now: $(node --version)"
+  log "Node now: $(node --version)"
 fi
 
 # 2. pnpm
 if ! command -v pnpm &>/dev/null; then
-  echo "Installing pnpm..."
+  log "Installing pnpm..."
   npm install -g pnpm@10 2>&1 | tail -1
 fi
 
 # 3. PostgreSQL (not preinstalled on Halerium runners).
 if ! ls /usr/lib/postgresql/*/bin/pg_ctl &>/dev/null 2>&1; then
-  echo "Installing PostgreSQL..."
+  log "Installing PostgreSQL..."
   sudo apt-get update -qq 2>&1 | tail -1
   sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq postgresql postgresql-client 2>&1 | tail -3
 fi
 
 PG_BIN=$(ls -d /usr/lib/postgresql/*/bin 2>/dev/null | sort -V | tail -1)
 if [ -z "$PG_BIN" ]; then
-  echo "ERROR: PostgreSQL installation failed."
+  log "ERROR: PostgreSQL installation failed."
   exit 1
 fi
-echo "PG_BIN: $PG_BIN"
+log "PG_BIN: $PG_BIN"
 
 PG_DATA="$APP_DIR/pg-data"
 
 # 4. initdb on first boot
 if [ ! -d "$PG_DATA" ] || [ -z "$(ls -A "$PG_DATA" 2>/dev/null)" ]; then
   mkdir -p "$PG_DATA"
-  echo "Initializing database cluster..."
+  log "Initializing database cluster..."
   "$PG_BIN/initdb" -D "$PG_DATA" --auth=trust --encoding=UTF8 --no-locale
   sed -i "s/^#\?port = .*/port = 5432/" "$PG_DATA/postgresql.conf"
   sed -i "s/^#\?listen_addresses = .*/listen_addresses = '127.0.0.1'/" "$PG_DATA/postgresql.conf"
@@ -76,7 +80,7 @@ fi
 if [ -f "$PG_DATA/postmaster.pid" ]; then
   PG_PID=$(head -1 "$PG_DATA/postmaster.pid" 2>/dev/null || echo "0")
   if ! kill -0 "$PG_PID" 2>/dev/null; then
-    echo "Removing stale postmaster.pid..."
+    log "Removing stale postmaster.pid..."
     rm -f "$PG_DATA/postmaster.pid"
   fi
 fi
@@ -92,7 +96,7 @@ for i in $(seq 1 10); do
 done
 
 if ! "$PG_BIN/pg_ctl" -D "$PG_DATA" status >/dev/null 2>&1; then
-  echo "Starting PostgreSQL..."
+  log "Starting PostgreSQL..."
   "$PG_BIN/pg_ctl" -D "$PG_DATA" -l "$PG_DATA/pg.log" -o "-p 5432" start -w -t 30
 fi
 
@@ -102,30 +106,30 @@ fi
 "$PG_BIN/psql" -h 127.0.0.1 -p 5432 -tAc "SELECT 1 FROM pg_database WHERE datname='app_db'" postgres 2>/dev/null | grep -q 1 \
   || "$PG_BIN/psql" -h 127.0.0.1 -p 5432 -c "CREATE DATABASE app_db OWNER app;" postgres 2>/dev/null || true
 "$PG_BIN/psql" -h 127.0.0.1 -p 5432 -c "GRANT ALL PRIVILEGES ON DATABASE app_db TO app;" postgres 2>/dev/null || true
-echo "PostgreSQL ready."
+log "PostgreSQL ready."
 
 # 7. Dependencies + schema + seed
 if [ ! -d node_modules ]; then
-  echo "Installing dependencies..."
+  log "Installing dependencies..."
   pnpm install --frozen-lockfile 2>&1 | tail -3
 fi
-echo "Applying migrations..."
-pnpm db:migrate 2>&1 || true
-echo "Seeding..."
-pnpm db:seed 2>&1 || true
+log "Applying migrations..."
+pnpm db:migrate >> "$LOG" 2>&1 || true
+log "Seeding..."
+pnpm db:seed >> "$LOG" 2>&1 || true
 
 # 8. Run — always via package.json scripts
 export PORT="${1:-8497}"
 
 if [ "$MODE" = "dev" ]; then
-  echo "=== App starting (dev) on port $PORT ==="
+  log "=== App starting (dev) on port $PORT ==="
   exec pnpm dev
 fi
 
 if [ ! -f dist/index.js ] || [ ! -d dist/public ]; then
-  echo "Building..."
-  NODE_OPTIONS="--max-old-space-size=768" pnpm build 2>&1
+  log "Building..."
+  NODE_OPTIONS="--max-old-space-size=768" pnpm build >> "$LOG" 2>&1
 fi
 
-echo "=== App starting (prod) on port $PORT ==="
+log "=== App starting (prod) on port $PORT ==="
 exec pnpm start

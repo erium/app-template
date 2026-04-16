@@ -21,6 +21,10 @@ APP_DIR="${APP_DIR:-$(cd "$(dirname "$0")" && pwd)}"
 cd "$APP_DIR"
 
 LOG="${APP_DIR}/app-startup.log"
+# Save original stdout/stderr so we can restore them before exec-ing the server.
+# tee logs the bootstrap phase; restoring the original fds closes the pipe and
+# lets tee exit cleanly — no orphaned process.
+exec 3>&1 4>&2
 exec > >(tee -a "$LOG") 2>&1
 
 echo "=== App Startup ==="
@@ -117,15 +121,29 @@ pnpm db:seed 2>&1 || true
 # 8. Run — always via package.json scripts
 export PORT="${1:-8497}"
 
-if [ "$MODE" = "dev" ]; then
-  echo "=== App starting (dev) on port $PORT ==="
-  exec pnpm dev
-fi
+# Restore original stdout/stderr. This closes the pipe to tee, which sees EOF
+# and exits — no orphaned tee process.
+exec 1>&3 2>&4 3>&- 4>&-
 
-if [ ! -f dist/index.js ] || [ ! -d dist/public ]; then
-  echo "Building..."
-  NODE_OPTIONS="--max-old-space-size=768" pnpm build 2>&1
-fi
+# Launch the server in its own process group (set -m) so we can kill the entire
+# tree (pnpm → sh → tsx → node) on exit. Without this, SIGTERM only hits pnpm
+# and its children survive as orphans.
+set -m
+run_server() {
+  if [ "$MODE" = "dev" ]; then
+    echo "=== App starting (dev) on port $PORT ==="
+    pnpm dev
+  else
+    if [ ! -f dist/index.js ] || [ ! -d dist/public ]; then
+      echo "Building..."
+      NODE_OPTIONS="--max-old-space-size=768" pnpm build 2>&1
+    fi
+    echo "=== App starting (prod) on port $PORT ==="
+    pnpm start
+  fi
+}
 
-echo "=== App starting (prod) on port $PORT ==="
-exec pnpm start
+run_server &
+SERVER_PID=$!
+trap "kill -- -$SERVER_PID 2>/dev/null; exit" INT TERM EXIT
+wait $SERVER_PID

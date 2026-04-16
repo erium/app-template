@@ -31,15 +31,17 @@ log "=== App Startup ==="
 log "Date: $(date)"
 log "Dir:  $APP_DIR"
 
+# Ensure /usr/local/bin is in PATH (n installs Node there, npm installs pnpm there).
+export PATH="/usr/local/bin:$PATH"
+
 # 1. Node >= 20 (Halerium runners ship v17).
 NODE_VER=$(node --version 2>/dev/null || echo "none")
 log "Current Node: $NODE_VER"
 if [[ "$NODE_VER" < "v20" ]]; then
   log "Upgrading Node to v20..."
-  npm install -g n 2>&1 | tail -1
+  sudo npm install -g n 2>&1 | tail -1
   sudo n 20 2>&1 | tail -3
   hash -r 2>/dev/null || true
-  export PATH="/usr/local/bin:$PATH"
   log "Node now: $(node --version)"
 fi
 
@@ -90,7 +92,11 @@ fi
 # apt-get install postgresql auto-starts the system cluster — stop it and wait
 # for port 5432 to be released before starting our local instance.
 sudo systemctl stop postgresql 2>/dev/null || true
-sudo pg_ctlcluster 14 main stop 2>/dev/null || true
+# Stop any system cluster regardless of PG version (12, 14, 16, …)
+for cluster in /etc/postgresql/*/main; do
+  ver=$(basename "$(dirname "$cluster")")
+  sudo pg_ctlcluster "$ver" main stop 2>/dev/null || true
+done
 for i in $(seq 1 10); do
   ss -tlnp 2>/dev/null | grep -q ":5432 " || break
   sleep 1

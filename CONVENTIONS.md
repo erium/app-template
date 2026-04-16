@@ -143,7 +143,7 @@ Never check roles inside a handler if middleware can enforce it.
 - Default environment is `node`. Files under `client/**/*.test.tsx` automatically use `jsdom` — see `vitest.config.ts`.
 - Prefer integration tests that hit the real DB over heavily mocked unit tests.
 - Integration tests isolate themselves by creating their own tenant + user with a `randomUUID()`-based email / slug and deleting the tenant in `afterAll` (cascade drops dependents). Tests run sequentially (`fileParallelism: false`) so they can share the dev database safely.
-- Prerequisite for integration tests: `bash setup-postgres.sh && pnpm db:push`.
+- Prerequisite for integration tests: `bash setup-postgres.sh && pnpm db:migrate`.
 
 ## Scripts Cheat Sheet
 
@@ -156,8 +156,14 @@ Never check roles inside a handler if middleware can enforce it.
 | `pnpm lint` / `pnpm lint:fix` | ESLint |
 | `pnpm format` | Prettier write |
 | `pnpm test` | Vitest |
-| `pnpm db:push` | Apply schema to PostgreSQL |
+| `pnpm db:generate` | Generate migration from schema changes |
+| `pnpm db:migrate` | Apply pending migrations |
+| `pnpm db:push` | Destructive sync — first-time setup only |
 | `pnpm db:seed` | Idempotent seed (default tenant + admin) |
+
+## Migrations
+
+Schema changes go through `drizzle/schema.ts` → `pnpm db:generate` → review SQL → `pnpm db:migrate` → commit the `.sql` file. Never use `db:push` on a database with real data. Never run raw DDL (`CREATE TABLE`, `ALTER TABLE`). See the **Database Migrations** section in `llm.txt` for full details.
 
 ## Anti-Patterns
 

@@ -102,8 +102,8 @@ if [ ! -d node_modules ]; then
   echo "Installing dependencies..."
   pnpm install --frozen-lockfile 2>&1 | tail -3
 fi
-echo "Pushing schema..."
-pnpm db:push 2>&1 || true
+echo "Applying migrations..."
+pnpm db:migrate 2>&1 || true
 echo "Seeding..."
 pnpm db:seed 2>&1 || true
 

@@ -39,8 +39,8 @@ bash setup-postgres.sh
 cp .env.example .env
 # edit .env — generate a JWT_SECRET with: openssl rand -hex 32
 
-# 4. Push schema and seed a default tenant + admin user
-pnpm db:push
+# 4. Apply migrations and seed a default tenant + admin user
+pnpm db:migrate
 pnpm db:seed
 
 # 5. Start the dev server
@@ -88,7 +88,9 @@ Change that password immediately.
 | `pnpm lint` / `pnpm lint:fix` | ESLint. |
 | `pnpm format` | Prettier write. |
 | `pnpm test` | Vitest. |
-| `pnpm db:push` | Apply `drizzle/schema.ts` to PostgreSQL. |
+| `pnpm db:generate` | Generate a migration from `drizzle/schema.ts` changes. |
+| `pnpm db:migrate` | Apply pending migrations to PostgreSQL. |
+| `pnpm db:push` | Destructive schema sync — **first-time local setup only**. |
 | `pnpm db:seed` | Idempotent default tenant + admin user. |
 
 ## Environment Variables
@@ -132,7 +134,7 @@ Replace [`client/public/favicon.svg`](./client/public/favicon.svg) with your own
 
 - **New page** — add a file to `client/src/pages/`, wire it into `client/src/App.tsx`.
 - **New API route** — add a file to `server/routes/`, register it in `server/routes/index.ts`.
-- **New DB table** — edit `drizzle/schema.ts`, run `pnpm db:push`, add helpers to `server/db.ts`.
+- **New DB table** — edit `drizzle/schema.ts`, run `pnpm db:generate` + `pnpm db:migrate`, add helpers to `server/db.ts`.
 - **New i18n string** — add the key to both `client/src/locales/de/common.json` and `en/common.json`.
 
 See the "Feature Recipe" section of `llm.txt` for the full step-by-step.

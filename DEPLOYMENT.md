@@ -5,7 +5,7 @@ Short, agent-oriented brief for deploying this template to Halerium. For local d
 ## TL;DR
 
 - Runner type: **`nano`**. `standard` silently fails on this environment.
-- Launch production: `bash start.sh [PORT]` — bootstraps Node, pnpm, Postgres, schema, builds, runs `pnpm start`.
+- Launch production: `bash start.sh [PORT]` — bootstraps Node, pnpm, Postgres, migrations, builds, runs `pnpm start`.
 - Launch dev (HMR): `bash start.sh --dev [PORT]` — same bootstrap, then `pnpm dev` (Vite + tsx watch).
 - `start.sh` launches the app via `package.json` scripts only (`pnpm start` / `pnpm dev`). Do not invoke `node dist/index.js` directly.
 - Reverse-proxy sub-path is already wired end-to-end. You don't need to touch `vite.config.ts`, wouter, or `api.ts`.
@@ -61,7 +61,7 @@ On every runner boot the script performs, idempotently:
 4. Runs `initdb` on first boot (creates `pg-data/`).
 5. Removes stale `pg-data/postmaster.pid` if the PID is gone (the daemon died with the previous spin-down).
 6. Starts the daemon, creates the `app` role and `app_db` database.
-7. `pnpm install` (if `node_modules` missing), `pnpm db:push`, `pnpm db:seed`.
+7. `pnpm install` (if `node_modules` missing), `pnpm db:migrate` (versioned migrations, not `db:push`), `pnpm db:seed`.
 8. **Prod mode** (default): `pnpm build` if `dist/` is missing, then `pnpm start`.
    **Dev mode** (`--dev`): skip build, `pnpm dev` for HMR + tsx watch.
 
@@ -79,7 +79,7 @@ On every runner boot the script performs, idempotently:
 
 When the app fails to start or behaves unexpectedly on a runner, check logs **before** making code changes:
 
-1. **`app-startup.log`** (repo root) — bootstrap output from `start.sh`. Shows whether Node upgrade, pnpm install, Postgres, schema push, build, or seed failed.
+1. **`app-startup.log`** (repo root) — bootstrap output from `start.sh`. Shows whether Node upgrade, pnpm install, Postgres, migrations, build, or seed failed.
 2. **`<pkg-name>_logs/error.log`** — server runtime errors (pino). If the process started but requests fail, look here.
 3. **`pg-data/pg.log`** — PostgreSQL daemon log. Check if the database won't start or connections are refused.
 4. **Browser dev tools → Console / Network** — if the page loads but is blank or shows errors, check for failed asset requests.

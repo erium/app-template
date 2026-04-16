@@ -55,8 +55,13 @@ The app lifecycle is managed via the Control App functions (`create_app`, `start
 
 **Do not assume the app works. Verify every time you start it:**
 
-1. **Read `app-startup.log`** (in the project root) — confirm bootstrap completed without errors (Node, Postgres, migrations, build, seed).
-2. **Check the health endpoint** — `curl http://localhost:PORT/api/health` → `{"status":"ok"}`. If this fails, the server didn't start — read the logs.
+1. **Read `app-startup.log`** (in the project root) — confirm the bootstrap completed. Look for these markers in order:
+   - `PostgreSQL ready.` — database is up.
+   - `migrations applied successfully` — schema is current.
+   - `Seed complete.` — default data exists.
+   - `App starting (dev|prod) on port XXXX` — server is launching.
+   - If any step is missing or you see `ERROR`, `FATAL`, or `could not start`, the bootstrap failed at that point. Fix the cause before continuing.
+2. **Check the health endpoint** — `curl http://localhost:PORT/api/health` → `{"status":"ok"}`. If this fails, the server didn't start — read `<pkg-name>_logs/error.log`.
 3. **Open the app in the browser** — verify the page loads and you can log in. If you see a blank page or a MIME-type error ("expected JavaScript, got text/html"), the build is missing or stale.
 4. **If something fails, read the logs before making code changes.** The fix is usually visible in the error output. Do not guess.
 

@@ -75,8 +75,29 @@ On every runner boot the script performs, idempotently:
 - **Sub-path simulation**: proxy `/some/path/` → `:8497` locally (nginx or similar) with `X-Forwarded-Prefix: /some/path`. Assets, routes, and API calls should all resolve.
 - **Halerium deploy**: create a `nano` app, run `bash start.sh`, open the app URL. First boot takes ~5 min (installing Postgres). Subsequent boots ~30 s.
 
+## Troubleshooting
+
+When the app fails to start or behaves unexpectedly on a runner, check logs **before** making code changes:
+
+1. **`app-startup.log`** (repo root) — bootstrap output from `start.sh`. Shows whether Node upgrade, pnpm install, Postgres, schema push, build, or seed failed.
+2. **`<pkg-name>_logs/error.log`** — server runtime errors (pino). If the process started but requests fail, look here.
+3. **`pg-data/pg.log`** — PostgreSQL daemon log. Check if the database won't start or connections are refused.
+4. **Browser dev tools → Console / Network** — if the page loads but is blank or shows errors, check for failed asset requests.
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| Blank page / "expected JavaScript, got text/html" | `dist/public/` missing — the catch-all returns `index.html` for every URL. | Run `pnpm build` and check for errors. On runners, delete `dist/` and re-run `start.sh`. |
+| App process exits immediately | Build never ran, or `dist/index.js` is missing. | Run `pnpm build` first. Check `app-startup.log` for build errors. |
+| Port conflict / app not reachable | Runner restarted but a stale process holds the port. | Check `app-startup.log` for "Port X is busy." The server auto-selects the next free port — find the actual port in the log. |
+| Database errors | Postgres daemon not running or stale PID. | Re-run `start.sh` (it cleans stale PIDs). Check `pg-data/pg.log`. |
+| 401 on every API call | `JWT_SECRET` not set in `.env`. | Add it: `openssl rand -hex 32`. |
+
+See also the **Build & Run** and **Common Failures** sections in `llm.txt` for the full reference.
+
 ## Anti-Patterns
 
 - Do not hardcode absolute URLs in client code. Use `BASE_PATH` / `getApiBase()` from `client/src/lib/basePath.ts`.
 - Do not assume Postgres is running. `start.sh` guarantees it on app boot; don't skip it on runner deployments.
 - Do not pick `standard` / `small` runner types until you have a reason — `nano` is what works here.
+- Do not run `pnpm start` without building first. `pnpm start` serves from `dist/`, which must be created by `pnpm build`. Use `start.sh` on runners — it handles the build automatically.
+- Do not claim the app works without verifying. After starting, check: `curl localhost:PORT/api/health` → `{"status":"ok"}`, then open the app in a browser.

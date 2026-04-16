@@ -36,6 +36,60 @@ pnpm db:seed     # idempotent seed: tenant + admin@example.com / ChangeMe!2026
 
 PostgreSQL setup: `bash setup-postgres.sh` (apt-installs locally, not Docker). Uninstall: `bash setup-postgres.sh uninstall`.
 
+## Build & Run
+
+### Development (iterating / debugging)
+
+```bash
+pnpm dev                         # Vite HMR + tsx watch, pino-pretty to console
+# or on a runner:
+bash start.sh --dev [PORT]       # same, but bootstraps Node/pnpm/Postgres first
+```
+
+1. Run the command above. Wait until the terminal shows `Server running on http://localhost:8497/`.
+2. Open the URL in a browser — verify the page loads and you can log in.
+3. Watch the terminal: every request and every error appears in real-time (pino-pretty at `debug` level).
+
+Use dev mode while iterating. Switch to production mode only for final deployment.
+
+### Production (deploying)
+
+```bash
+pnpm build                       # Vite client build + esbuild server bundle
+pnpm start                       # serve the built app
+# or on a runner (handles everything):
+bash start.sh [PORT]
+```
+
+1. `pnpm build` — **read the output.** If it shows errors, fix them before continuing.
+2. `pnpm start` (or `bash start.sh [PORT]` on runners — it builds automatically if `dist/` is missing).
+3. Verify: `curl http://localhost:PORT/api/health` → `{"status":"ok"}`.
+4. Open the app in a browser. If you see a blank page or a MIME-type error ("expected JavaScript, got text/html"), the build is missing or stale — re-run `pnpm build`.
+
+**Never run `pnpm start` without building first** — it serves from `dist/`, which won't exist until you build.
+
+### Log Files
+
+| Log | Path | When to check |
+|---|---|---|
+| Console (dev) | terminal stdout | Always in dev — every request and error appears here. |
+| App log | `<pkg-name>_logs/app.log` | All log levels. Check when debugging prod issues. |
+| Error log | `<pkg-name>_logs/error.log` | Errors only — **check first** when something breaks. |
+| Startup log | `app-startup.log` (repo root) | Bootstrap output from `start.sh` (Node/Postgres/build/seed). Check if the app fails to boot on a runner. |
+| PostgreSQL | `pg-data/pg.log` | Database daemon log. Check if queries fail or connections are refused. |
+
+`<pkg-name>` is derived from the `name` field in `package.json` (default: `my-app` → `my-app_logs/`).
+
+### Common Failures
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| Blank page or "expected JavaScript module, got text/html" | `dist/public/` missing or stale — the catch-all returns `index.html` for every URL. | Run `pnpm build`, check for errors. |
+| `Port XXXX is busy` in logs | Another process holds the port. | Server auto-finds the next free port. Check log output for the actual port. |
+| Database connection refused | PostgreSQL not running. | `bash setup-postgres.sh` (local) or `bash start.sh` (runner). Check `pg-data/pg.log`. |
+| API returns 401 on every request | `JWT_SECRET` not set. | Add `JWT_SECRET` to `.env`. Generate with `openssl rand -hex 32`. |
+| `Cannot find module 'dist/index.js'` | Production build never ran. | `pnpm build` first, then `pnpm start`. |
+
 ## Directory Map
 
 ```
@@ -186,6 +240,8 @@ OPENAI_MODEL=gpt-4o-mini
 
 Never:
 
+- Deploy without building first. `pnpm start` serves from `dist/` — run `pnpm build` and check its output for errors before starting. On runners, use `start.sh` (it builds automatically).
+- Claim the app is working without verifying. After starting, check `curl localhost:PORT/api/health` → `{"status":"ok"}` and open the app in a browser. If something fails, read the logs (see **Log Files** above) before making more changes.
 - Reintroduce tRPC. The API is Express REST by design.
 - Add `axios`. Use the `fetch`-based `api.*` wrapper.
 - Call `fetch` directly from a component. Go through `client/src/lib/api.ts`.

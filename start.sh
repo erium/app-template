@@ -43,10 +43,11 @@ if [[ "$NODE_VER" < "v20" ]]; then
   log "Node now: $(node --version)"
 fi
 
-# 2. pnpm
+# 2. pnpm (sudo required — `n` installs Node to /usr/local/ owned by root)
 if ! command -v pnpm &>/dev/null; then
   log "Installing pnpm..."
-  npm install -g pnpm@10 2>&1 | tail -1
+  sudo npm install -g pnpm@10 2>&1 | tail -1
+  hash -r 2>/dev/null || true
 fi
 
 # 3. PostgreSQL (not preinstalled on Halerium runners).

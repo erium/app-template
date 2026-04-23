@@ -1,0 +1,56 @@
+workflow:
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+
+default:
+  image: node:20
+  cache:
+    key:
+      files:
+        - pnpm-lock.yaml
+    paths:
+      - .pnpm-store
+
+stages:
+  - test
+  - deploy
+
+variables:
+  DATABASE_URL: "postgresql://postgres:postgres@postgres:5432/app_db"
+  JWT_SECRET: "ci-test-secret"
+  POSTGRES_DB: app_db
+  POSTGRES_USER: postgres
+  POSTGRES_PASSWORD: postgres
+
+test:
+  stage: test
+  services:
+    - name: postgres:16
+      alias: postgres
+  before_script:
+    - corepack enable
+    - corepack prepare pnpm@10 --activate
+    - pnpm config set store-dir .pnpm-store
+    - pnpm install --frozen-lockfile
+    - pnpm db:push
+  script:
+    - pnpm check
+    - pnpm lint
+    - pnpm test
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main"'
+
+deploy_github:
+  stage: deploy
+  image: alpine/git:latest
+  script:
+    - git config --global user.email "hal@erium.ai"
+    - git config --global user.name "Halerium"
+    - git remote remove github 2>/dev/null || true
+    - git remote add github "https://gitlab-ci-token:${GITHUB_TOKEN}@github.com/erium/app-template.git"
+    - git push github "HEAD:refs/heads/main" --force
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+  needs:
+    - test

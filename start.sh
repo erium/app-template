@@ -129,7 +129,7 @@ fi
 log "Applying migrations..."
 pnpm db:migrate >> "$LOG" 2>&1 || true
 log "Syncing schema..."
-pnpm db:push -- --force >> "$LOG" 2>&1 || true
+pnpm exec drizzle-kit push --force >> "$LOG" 2>&1 || true
 log "Seeding..."
 pnpm db:seed >> "$LOG" 2>&1 || true
 

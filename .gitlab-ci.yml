@@ -47,6 +47,8 @@ deploy_github:
     name: alpine/git:latest
     entrypoint: [""]
   script:
+    - test -n "$GITHUB_TOKEN" || { echo "ERROR GITHUB_TOKEN is empty — check GitLab CI/CD variables and whether main is a protected branch"; exit 1; }
+    - echo "Token length = ${#GITHUB_TOKEN}"
     - git config --global user.email "hal@erium.ai"
     - git config --global user.name "Halerium"
     - git remote remove github 2>/dev/null || true

@@ -121,7 +121,7 @@ if [ ! -d node_modules ]; then
   pnpm install --frozen-lockfile 2>&1 | tail -3
 fi
 log "Applying schema..."
-pnpm db:push >> "$LOG" 2>&1 || true
+pnpm db:push -- --force >> "$LOG" 2>&1 || true
 log "Seeding..."
 pnpm db:seed >> "$LOG" 2>&1 || true
 

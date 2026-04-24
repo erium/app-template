@@ -11,6 +11,7 @@ Clone it, rename it, build your app on top.
 - **i18n** — `react-i18next` with English + German, auto language detection.
 - **Stripe billing** — Checkout session creation, webhook-based fulfillment, transaction history.
 - **PDF export** — Playwright-based HTML → PDF REST endpoint.
+- **AI chat** — Vercel AI SDK streaming example at `/chat-example`, OpenAI-compatible (swap `OPENAI_BASE_URL` for Azure / OpenRouter / local).
 - **Email** — Nodemailer with SMTP (logs to console if unconfigured).
 - **UI** — shadcn/ui (53 components) on TailwindCSS 4, Radix primitives, dark-mode ready.
 - **Type-safe API** — Express REST with zod validation and a typed `fetch` wrapper on the client.
@@ -25,6 +26,9 @@ Clone it, rename it, build your app on top.
 ## Quick Start
 
 ```bash
+# 0. Detach from the template repo so you don't accidentally push upstream
+bash detach.sh
+
 # 1. Install dependencies
 pnpm install
 
@@ -35,8 +39,8 @@ bash setup-postgres.sh
 cp .env.example .env
 # edit .env — generate a JWT_SECRET with: openssl rand -hex 32
 
-# 4. Push schema and seed a default tenant + admin user
-pnpm db:push
+# 4. Apply migrations and seed a default tenant + admin user
+pnpm db:migrate
 pnpm db:seed
 
 # 5. Start the dev server
@@ -84,7 +88,9 @@ Change that password immediately.
 | `pnpm lint` / `pnpm lint:fix` | ESLint. |
 | `pnpm format` | Prettier write. |
 | `pnpm test` | Vitest. |
-| `pnpm db:push` | Apply `drizzle/schema.ts` to PostgreSQL. |
+| `pnpm db:generate` | Generate a migration from `drizzle/schema.ts` changes. |
+| `pnpm db:migrate` | Apply pending migrations to PostgreSQL. |
+| `pnpm db:push` | Destructive schema sync — **first-time local setup only**. |
 | `pnpm db:seed` | Idempotent default tenant + admin user. |
 
 ## Environment Variables
@@ -128,7 +134,7 @@ Replace [`client/public/favicon.svg`](./client/public/favicon.svg) with your own
 
 - **New page** — add a file to `client/src/pages/`, wire it into `client/src/App.tsx`.
 - **New API route** — add a file to `server/routes/`, register it in `server/routes/index.ts`.
-- **New DB table** — edit `drizzle/schema.ts`, run `pnpm db:push`, add helpers to `server/db.ts`.
+- **New DB table** — edit `drizzle/schema.ts`, run `pnpm db:generate` + `pnpm db:migrate`, add helpers to `server/db.ts`.
 - **New i18n string** — add the key to both `client/src/locales/de/common.json` and `en/common.json`.
 
 See the "Feature Recipe" section of `llm.txt` for the full step-by-step.
@@ -141,6 +147,17 @@ This repo uses local PostgreSQL installed via `setup-postgres.sh`, not Docker �
 - Stop and uninstall: `bash setup-postgres.sh uninstall`
 
 If you want to use an existing PostgreSQL instance, skip the script and set `DATABASE_URL` in `.env` accordingly.
+
+### Stopping the Dev Server
+
+`pnpm dev` (and `bash start.sh --dev`) may leave orphaned Node processes after Ctrl+C because pnpm doesn't forward signals to its full child tree. If the port stays busy after stopping:
+
+```bash
+# Find and kill whatever holds the port
+sudo lsof -i :8497 -t | xargs kill
+```
+
+This is a local dev issue only — on Halerium runners, `stop_app` kills the entire process tree cleanly.
 
 ## License
 

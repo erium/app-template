@@ -3,6 +3,7 @@ import { z } from "zod";
 import { stripe } from "../stripe";
 import * as db from "../db";
 import { requireAuth } from "../middleware/auth";
+import { logger } from "../utils/logger";
 
 const router = Router();
 
@@ -55,7 +56,7 @@ router.post("/checkout", async (req: Request, res: Response) => {
 
     res.json({ url: session.url });
   } catch (error) {
-    console.error("Stripe Checkout Error:", error);
+    logger.error({ err: error }, "Stripe Checkout error");
     res.status(500).json({
       error:
         "Fehler beim Erstellen der Checkout-Session: " +
@@ -70,7 +71,7 @@ router.get("/transactions", async (req: Request, res: Response) => {
     const history = await db.getTransactionsByUser(req.user!.id);
     res.json(history);
   } catch (err) {
-    console.error("[Payment] getTransactions error:", err);
+    logger.error({ err }, "[Payment] getTransactions error");
     res.status(500).json({ error: "Interner Serverfehler" });
   }
 });

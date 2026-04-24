@@ -11,6 +11,7 @@ import {
   sendPasswordResetEmail,
 } from "../email";
 import { requireAuth } from "../middleware/auth";
+import { logger } from "../utils/logger";
 
 const router = Router();
 
@@ -32,7 +33,7 @@ router.post("/language", requireAuth, async (req: Request, res: Response) => {
     await db.updateUserLanguage(req.user!.id, parsed.data.language);
     res.json({ success: true });
   } catch (err) {
-    console.error("[Auth] updateLanguage error:", err);
+    logger.error({ err }, "[Auth] updateLanguage error:");
     res.status(500).json({ error: "Interner Serverfehler" });
   }
 });
@@ -80,12 +81,12 @@ router.post("/register", async (req: Request, res: Response) => {
     });
 
     sendVerificationEmail(input.email, verificationToken, input.name).catch(
-      (e) => console.error("Failed to send verification email:", e),
+      (err) => logger.error({ err }, "Failed to send verification email"),
     );
 
     res.json({ success: true, message: "Bitte E-Mail bestätigen" });
   } catch (err) {
-    console.error("[Auth] register error:", err);
+    logger.error({ err }, "[Auth] register error:");
     res.status(500).json({ error: "Interner Serverfehler" });
   }
 });
@@ -118,7 +119,7 @@ router.post("/verify-email", async (req: Request, res: Response) => {
 
     res.json({ success: true });
   } catch (err) {
-    console.error("[Auth] verifyEmail error:", err);
+    logger.error({ err }, "[Auth] verifyEmail error:");
     res.status(500).json({ error: "Interner Serverfehler" });
   }
 });
@@ -167,7 +168,7 @@ router.post("/login", async (req: Request, res: Response) => {
 
     res.json({ user });
   } catch (err) {
-    console.error("[Auth] login error:", err);
+    logger.error({ err }, "[Auth] login error:");
     res.status(500).json({ error: "Interner Serverfehler" });
   }
 });
@@ -234,7 +235,7 @@ router.post("/join", async (req: Request, res: Response) => {
 
     res.json({ success: true });
   } catch (err) {
-    console.error("[Auth] join error:", err);
+    logger.error({ err }, "[Auth] join error:");
     res.status(500).json({ error: "Interner Serverfehler" });
   }
 });
@@ -265,7 +266,7 @@ router.post("/forgot-password", async (req: Request, res: Response) => {
 
     res.json({ success: true });
   } catch (err) {
-    console.error("[Auth] forgotPassword error:", err);
+    logger.error({ err }, "[Auth] forgotPassword error:");
     res.status(500).json({ error: "Interner Serverfehler" });
   }
 });
@@ -303,7 +304,7 @@ router.post("/reset-password", async (req: Request, res: Response) => {
 
     res.json({ success: true });
   } catch (err) {
-    console.error("[Auth] resetPassword error:", err);
+    logger.error({ err }, "[Auth] resetPassword error:");
     res.status(500).json({ error: "Interner Serverfehler" });
   }
 });
@@ -318,7 +319,7 @@ router.delete("/account", requireAuth, async (req: Request, res: Response) => {
 
     res.json({ success: true });
   } catch (err) {
-    console.error("[Auth] deleteAccount error:", err);
+    logger.error({ err }, "[Auth] deleteAccount error:");
     res.status(500).json({ error: "Interner Serverfehler" });
   }
 });

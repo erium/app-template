@@ -2,6 +2,16 @@
 
 A dense brief for AI coding agents working in this repo. Read this first. For full detail, see `CONVENTIONS.md` (coding standards) and `README.md` (quick start).
 
+## First Step: Detach From the Template Repo
+
+**Before you touch anything else, run `bash detach.sh`.** The template is cloned from `erium/app-template`; leaving that remote attached risks accidentally pushing an app's work back upstream. The script is idempotent:
+
+- If `origin` points at `erium/app-template`, it wipes `.git/` and runs `git init` + initial commit so your new project has a clean history.
+- If there is no `.git/`, it initializes one.
+- If `origin` is anything else (or missing), it exits without changes.
+
+After detaching, add your own remote with `git remote add origin <your-repo-url>`. Do not push before running this script.
+
 ## What This Is
 
 A generic full-stack TypeScript template: React frontend + Express REST backend + PostgreSQL via Drizzle ORM. Ships with auth, multi-tenancy (tenant → users → invitations), i18n (de/en), Stripe billing, PDF export (Playwright), and 53 shadcn/ui components. Single `package.json` (no monorepo). Branding lives in `shared/config.ts`.
@@ -11,19 +21,121 @@ A generic full-stack TypeScript template: React frontend + Express REST backend 
 - **Runtime:** Node 20+, pnpm 10
 - **Frontend:** React 19, Vite 7, wouter 3 (routing), TailwindCSS 4, shadcn/ui, react-hook-form 7, react-i18next 16, @tanstack/react-query 5, sonner (toasts)
 - **Backend:** Express 4, drizzle-orm 0.44 + pg 8 (PostgreSQL), jose 6 (JWT), bcryptjs 3, zod 4, nodemailer 8, stripe 20, playwright 1.58
+- **AI:** Vercel AI SDK 4 (`ai`, `@ai-sdk/openai`, `@ai-sdk/react`) — example route at `/api/chat`, example UI at `/chat-example`
 - **TypeScript:** 5.9, strict mode
 
 ## Commands
 
 ```bash
-pnpm dev         # dev server on :8497 (Vite + tsx watch)
-pnpm build       # Vite client build + esbuild server bundle
-pnpm check       # tsc --noEmit
-pnpm db:push     # apply drizzle/schema.ts to Postgres
-pnpm db:seed     # idempotent seed: tenant + admin@example.com / ChangeMe!2026
+pnpm dev          # dev server on :8497 (Vite + tsx watch)
+pnpm build        # Vite client build + esbuild server bundle
+pnpm check        # tsc --noEmit
+pnpm db:generate  # generate a migration from schema.ts changes
+pnpm db:migrate   # apply pending migrations (use this, not db:push)
+pnpm db:push      # destructive schema sync — first-time local setup ONLY
+pnpm db:seed      # idempotent seed: tenant + admin@example.com / ChangeMe!2026
 ```
 
 PostgreSQL setup: `bash setup-postgres.sh` (apt-installs locally, not Docker). Uninstall: `bash setup-postgres.sh uninstall`.
+
+## Build & Run
+
+The app lifecycle is managed via the Control App functions (`create_app`, `start_app`, `stop_app`, `update_app`). When creating or starting the app, set `working_directory` to the project root and `start_commands` to one of:
+
+| Mode | `start_commands` | When to use |
+|---|---|---|
+| **Dev** | `bash start.sh --dev PORT` | While developing and debugging. Logs every request at `debug` level. |
+| **Prod** | `bash start.sh PORT` | Final deployment. Builds automatically, logs at `info` level. |
+
+`start.sh` handles the full bootstrap (Node upgrade, pnpm, Postgres, migrations, seed, build) — you don't need to run these steps separately.
+
+**Use dev mode (`--dev`) while iterating.** It gives you richer logs (pino-pretty, debug level) that make errors much easier to find. Only switch to prod mode for the final deployment.
+
+### After Starting — Verify (mandatory)
+
+**Do not assume the app works. Verify every time you start it:**
+
+1. **Read `app-startup.log`** (in the project root) — confirm the bootstrap completed. Look for these markers in order:
+   - `PostgreSQL ready.` — database is up.
+   - `migrations applied successfully` — schema is current.
+   - `Seed complete.` — default data exists.
+   - `App starting (dev|prod) on port XXXX` — server is launching.
+   - If any step is missing or you see `ERROR`, `FATAL`, or `could not start`, the bootstrap failed at that point. Fix the cause before continuing.
+2. **Check the health endpoint** — `curl http://localhost:PORT/api/health` → `{"status":"ok"}`. If this fails, the server didn't start — read `<pkg-name>_logs/error.log`.
+3. **Open the app in the browser** — verify the page loads and you can log in. If you see a blank page or a MIME-type error ("expected JavaScript, got text/html"), the build is missing or stale.
+4. **If something fails, read the logs before making code changes.** The fix is usually visible in the error output. Do not guess.
+
+### Debugging Workflow
+
+When the app fails or misbehaves after starting:
+
+1. **Stop the app** (via `stop_app`).
+2. **Read the logs** — check `app-startup.log`, `<pkg-name>_logs/error.log`, and `pg-data/pg.log` (see Log Files below).
+3. **Ensure you are running in dev mode** (`bash start.sh --dev PORT` in `start_commands`) — dev mode logs every request and error at `debug` level.
+4. **Start the app** (via `start_app`), open it in the browser, trigger the failing action, and read the log output.
+5. **Fix and restart** — make the code change, then stop → start → verify again.
+
+**Never claim the app is fixed without going through this cycle.**
+
+### Log Files
+
+| Log | Path | When to check |
+|---|---|---|
+| Console (dev) | terminal stdout | Always in dev — every request and error appears here. |
+| App log | `<pkg-name>_logs/app.log` | All log levels. Check when debugging prod issues. |
+| Error log | `<pkg-name>_logs/error.log` | Errors only — **check first** when something breaks. |
+| Startup log | `app-startup.log` (repo root) | Bootstrap output from `start.sh` (Node/Postgres/build/seed). Check if the app fails to boot on a runner. |
+| PostgreSQL | `pg-data/pg.log` | Database daemon log. Check if queries fail or connections are refused. |
+
+`<pkg-name>` is derived from the `name` field in `package.json` (default: `my-app` → `my-app_logs/`).
+
+### Common Failures
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| Blank page or "expected JavaScript module, got text/html" | `dist/public/` missing or stale — the catch-all returns `index.html` for every URL. | Run `pnpm build`, check for errors. |
+| `Port XXXX is busy` in logs | Another process holds the port. | Server auto-finds the next free port. Check log output for the actual port. |
+| Database connection refused | PostgreSQL not running. | `bash setup-postgres.sh` (local) or `bash start.sh` (runner). Check `pg-data/pg.log`. |
+| API returns 401 on every request | `JWT_SECRET` not set. | Add `JWT_SECRET` to `.env`. Generate with `openssl rand -hex 32`. |
+| `Cannot find module 'dist/index.js'` | Production build never ran. | `pnpm build` first, then `pnpm start`. |
+
+## Database Migrations
+
+Schema changes **must** go through Drizzle migrations so that every change is versioned, reviewable, and reproducible. Never alter the database directly with raw SQL.
+
+### Workflow
+
+```bash
+# 1. Edit the schema definition
+#    → drizzle/schema.ts
+
+# 2. Generate a migration (creates a numbered .sql file)
+pnpm db:generate
+
+# 3. Review the generated SQL in drizzle/migrations/NNNN_*.sql
+
+# 4. Apply the migration
+pnpm db:migrate
+
+# 5. Commit the migration file — it is version-controlled
+git add drizzle/migrations/
+```
+
+### Commands
+
+| Command | What it does | When to use |
+|---|---|---|
+| `pnpm db:generate` | Diffs `schema.ts` against the last migration snapshot, writes a new `.sql` file. | After every schema change. |
+| `pnpm db:migrate` | Applies all pending `.sql` migrations in order. | Dev, CI, production — always. `start.sh` runs this automatically. |
+| `pnpm db:push` | Destructively syncs `schema.ts` to the database without migration files. | **First-time local setup only**, before any real data exists. Never in production. |
+| `pnpm db:seed` | Idempotent seed: default tenant + admin user. | After migrations, on first setup. |
+
+### Rules
+
+- **Always commit migration files.** The `.sql` files in `drizzle/migrations/` and the `meta/` journal are the authoritative record of every schema change. Without them, `db:migrate` on another machine or runner has nothing to apply.
+- **Never run raw SQL** (`CREATE TABLE`, `ALTER TABLE`, `DROP`) to change the schema. All changes go through `drizzle/schema.ts` → `pnpm db:generate`.
+- **Never use `db:push` in production** or on any database with real data. It can drop columns and lose data without warning.
+- **Review generated SQL before applying.** `db:generate` is not infallible — check that the `.sql` makes sense (e.g., no unexpected `DROP COLUMN`).
 
 ## Directory Map
 
@@ -38,10 +150,12 @@ server/
   _core/          entry point, env, cookies, vite dev middleware
   middleware/     auth.ts: authenticateUser, requireAuth, requireAdmin
   routes/         Express routers per resource (auth, tenant, payment, export)
+  utils/          logger.ts (pino) — use this, not console
   db.ts           ALL drizzle queries go here
   email.ts, stripe.ts, pdfExport.ts, webhookRoutes.ts
 drizzle/
   schema.ts       tenants, users, invitations, transactions
+  migrations/     versioned .sql files (committed) + meta/ journal
   seed.ts         default tenant + admin user
 shared/
   config.ts       APP_NAME, APP_DESCRIPTION, SUPPORT_EMAIL
@@ -80,13 +194,14 @@ Never check roles inside a handler when middleware can enforce it.
 
 To add a new feature end-to-end:
 
-1. **Schema (if needed)** — edit `drizzle/schema.ts`, run `pnpm db:push`.
+1. **Schema (if needed)** — edit `drizzle/schema.ts`, run `pnpm db:generate` to create a migration, review the SQL, then `pnpm db:migrate` to apply it. Commit the migration file.
 2. **DB helpers** — add async functions to `server/db.ts` using drizzle-orm. Use `.returning()` for writes, destructure `[row]` for single-row reads.
 3. **API route** — create `server/routes/<resource>.ts` exporting an Express `Router`. Validate body with zod. Register in `server/routes/index.ts`.
 4. **API client method** — add a typed entry to `client/src/lib/api.ts`. Add its query key to `queryKeys` if used with react-query.
 5. **Page or component** — create in `client/src/pages/` or `client/src/components/`. Fetch via `useQuery({ queryFn: api.<method> })`. Wire it into `client/src/App.tsx` if it's a page.
-6. **i18n** — add every user-facing string as a key in `client/src/locales/de/common.json` AND `en/common.json`. Use `const { t } = useTranslation(); t("key")`.
-7. **Verify** — `pnpm check` (types), `pnpm lint`, manual test at `http://localhost:8497`.
+6. **Sidebar entry (if it's a page users navigate to)** — add an item to `menuGroups` in `client/src/components/DashboardLayout.tsx`: `{ icon, label: "<i18n_key>", path: "/your-page", roles?: ["admin"] }`. Skip this step if the page is intentionally opt-in by URL only.
+7. **i18n** — add every user-facing string as a key in `client/src/locales/de/common.json` AND `en/common.json`. Use `const { t } = useTranslation(); t("key")`. The sidebar `label` is an i18n key, not a literal string.
+8. **Verify** — `pnpm check` (types), `pnpm lint`, manual test at `http://localhost:8497`.
 
 ## Quick Patterns
 
@@ -130,16 +245,62 @@ router.post("/login", async (req, res) => {
 });
 ```
 
+## Deployment (sub-path / Halerium)
+
+The template is deployable behind a reverse-proxy sub-path (e.g. Halerium mounts apps at `/apps/<org>/<ws>/<AppName>/`). Three layers are already wired — do not duplicate this logic:
+
+- **Assets** — `vite.config.ts` has `base: "./"` (relative URLs resolved against `document.baseURI`).
+- **Client routing** — `client/src/App.tsx` wraps routes in `<Router base={BASE_PATH}>`.
+- **API client** — `client/src/lib/api.ts` prepends `BASE_PATH` to `/api/*` calls.
+
+`BASE_PATH` is resolved in `client/src/lib/basePath.ts`: `VITE_BASE_PATH` env → `<base href>` tag → `""`. The server (`server/_core/vite.ts`) injects the `<base href="${prefix}/">` tag at request time, reading `X-Forwarded-Prefix` or the `BASE_PATH` env var.
+
+**Runner bootstrap:** `start.sh` (at repo root) idempotently upgrades Node to v20, installs pnpm + Postgres, handles stale `postmaster.pid` after ephemeral spin-downs, pushes schema, seeds, and launches via package.json scripts only:
+
+- `bash start.sh [PORT]` — prod: builds if needed, runs `pnpm start`.
+- `bash start.sh --dev [PORT]` — dev: runs `pnpm dev` (Vite + tsx watch, HMR). Use this while iterating.
+
+Use runner type **`nano`** on Halerium (`standard` silently fails).
+
+Full detail in `DEPLOYMENT.md`.
+
+## How to Add AI Chat to Your App
+
+The template ships with a Vercel AI SDK example at `/chat-example` (requires login, linked from the sidebar as "AI Chat"). Use it as the starting point for any LLM-powered feature.
+
+**Env vars** (add to `.env` — all optional; endpoint returns 503 without a key):
+
+```
+OPENAI_API_KEY=sk-...
+OPENAI_BASE_URL=https://api.openai.com/v1   # override for OpenAI-compatible endpoints
+OPENAI_MODEL=gpt-4o-mini
+```
+
+`OPENAI_BASE_URL` lets you swap in Azure OpenAI, OpenRouter, vLLM, or a local Ollama (via its OpenAI-compat shim) without code changes.
+
+**Server — `server/routes/chat.ts`** — `requireAuth` router, zod-validates `{ messages }`, pipes `streamText(...).pipeDataStreamToResponse(res)`. Swap providers by installing `@ai-sdk/anthropic` (or similar) and replacing `openai(model)` with `anthropic(model)`.
+
+**Client — `client/src/components/chat/ChatExample.tsx`** — uses `useChat` from `@ai-sdk/react` with `api: \`${getApiBase()}/chat\`` and `credentials: "include"`. The `getApiBase()` call is required — hard-coding `/api/chat` breaks sub-path deployments.
+
+**To add a new AI feature**: copy `chat.ts`, adjust the system prompt / messages shape, register it in `server/routes/index.ts`, and build a UI using `useChat` (chat) or `useCompletion` (single-turn) pointed at the new endpoint.
+
 ## Anti-Patterns
 
 Never:
 
+- Deploy without building first. `pnpm start` serves from `dist/` — run `pnpm build` and check its output for errors before starting. On runners, use `start.sh` (it builds automatically).
+- Claim the app is working without verifying. After starting, check `curl localhost:PORT/api/health` → `{"status":"ok"}` and open the app in a browser. If something fails, read the logs (see **Log Files** above) before making more changes.
+- Run `db:push` against a production database or any database with real data. Use `pnpm db:generate` + `pnpm db:migrate` instead. See **Database Migrations** above.
+- Skip committing migration files. The `.sql` files in `drizzle/migrations/` are version-controlled — they are the authoritative record of every schema change.
+- Run raw SQL (`CREATE TABLE`, `ALTER TABLE`, `DROP`) to change the schema. All changes go through `drizzle/schema.ts` → `pnpm db:generate`.
 - Reintroduce tRPC. The API is Express REST by design.
 - Add `axios`. Use the `fetch`-based `api.*` wrapper.
 - Call `fetch` directly from a component. Go through `client/src/lib/api.ts`.
 - Scatter drizzle queries across route handlers. Put them in `server/db.ts`.
 - Hardcode `APP_NAME`, support email, or copy strings. Use `shared/config.ts` and i18n keys.
-- Commit `.env`, `pg-data/`, `uploads/`, `data/`, `dist/`.
+- Assume the app is served from `/`. Use `BASE_PATH` / `getApiBase()` from `client/src/lib/basePath.ts` for client-side URL construction.
+- Use `console.log/error/warn` in server code. Import `logger` from `server/utils/logger.ts` and use `logger.info/warn/error/debug`. Pass errors as `logger.error({ err }, "message")`. Logs land in `<pkg-name>_logs/app.log` (all levels) and `error.log` (errors). Dev defaults to `debug`, prod to `info`; override with `LOG_LEVEL`.
+- Commit `.env`, `pg-data/`, `uploads/`, `data/`, `dist/`, `*_logs/`.
 - Skip git hooks with `--no-verify`.
 - Use `any`, `console.log` in committed code, or browser `alert`.
 
@@ -149,6 +310,7 @@ Full list in `CONVENTIONS.md`.
 
 - **[`CONVENTIONS.md`](./CONVENTIONS.md)** — complete coding standards, naming, file layout, testing.
 - **[`ARCHITECTURE.md`](./ARCHITECTURE.md)** — system overview with ASCII diagrams.
+- **[`DEPLOYMENT.md`](./DEPLOYMENT.md)** — Halerium runner, proxy sub-path config, ephemeral DB bootstrap.
 - **[`README.md`](./README.md)** — human-oriented quick start and customization.
 - **[`docs/architecture-logical.md`](./docs/architecture-logical.md)** — runtime view and sequence diagrams (mermaid).
 - **[`docs/architecture-development.md`](./docs/architecture-development.md)** — build pipeline and code organization.

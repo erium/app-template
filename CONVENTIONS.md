@@ -127,6 +127,15 @@ Never check roles inside a handler if middleware can enforce it.
 - Never hardcode the app name, support email, or domain URLs anywhere else.
 - Secrets live in `.env`. `.env.example` documents every variable.
 
+## Logging
+
+- Server code uses `logger` from `server/utils/logger.ts` (pino). Never use `console.*` on the server.
+- Call sites: `logger.info("message")`, `logger.warn({ key: value }, "message")`, `logger.error({ err }, "message")`. Passing errors as `{ err }` preserves stack traces.
+- HTTP access logs are emitted automatically by `pino-http` — you don't need to log requests manually.
+- Files land in `<pkg-name>_logs/` at the repo root: `app.log` (all levels) and `error.log` (errors). `pino-roll` rotates daily / at 10 MB.
+- Levels: dev defaults to `debug`, prod to `info`. Override with `LOG_LEVEL` in `.env` (e.g. `LOG_LEVEL=trace`).
+- `<pkg-name>` is derived from `package.json`'s `name` field.
+
 ## Testing
 
 - Framework: `vitest`. Run with `pnpm test`.
@@ -134,7 +143,7 @@ Never check roles inside a handler if middleware can enforce it.
 - Default environment is `node`. Files under `client/**/*.test.tsx` automatically use `jsdom` — see `vitest.config.ts`.
 - Prefer integration tests that hit the real DB over heavily mocked unit tests.
 - Integration tests isolate themselves by creating their own tenant + user with a `randomUUID()`-based email / slug and deleting the tenant in `afterAll` (cascade drops dependents). Tests run sequentially (`fileParallelism: false`) so they can share the dev database safely.
-- Prerequisite for integration tests: `bash setup-postgres.sh && pnpm db:push`.
+- Prerequisite for integration tests: `bash setup-postgres.sh && pnpm db:migrate`.
 
 ## Scripts Cheat Sheet
 
@@ -147,8 +156,14 @@ Never check roles inside a handler if middleware can enforce it.
 | `pnpm lint` / `pnpm lint:fix` | ESLint |
 | `pnpm format` | Prettier write |
 | `pnpm test` | Vitest |
-| `pnpm db:push` | Apply schema to PostgreSQL |
+| `pnpm db:generate` | Generate migration from schema changes |
+| `pnpm db:migrate` | Apply pending migrations |
+| `pnpm db:push` | Destructive sync — first-time setup only |
 | `pnpm db:seed` | Idempotent seed (default tenant + admin) |
+
+## Migrations
+
+Schema changes go through `drizzle/schema.ts` → `pnpm db:generate` → review SQL → `pnpm db:migrate` → commit the `.sql` file. Never use `db:push` on a database with real data. Never run raw DDL (`CREATE TABLE`, `ALTER TABLE`). See the **Database Migrations** section in `llm.txt` for full details.
 
 ## Anti-Patterns
 
@@ -158,8 +173,8 @@ Do not:
 - Add `axios`. Use `fetch` via `api.ts`.
 - Scatter DB queries across route handlers. Put them in `server/db.ts`.
 - Hardcode copy. Use i18n keys.
-- Commit `.env`, `pg-data/`, `uploads/`, `data/`, or `dist/`.
+- Commit `.env`, `pg-data/`, `uploads/`, `data/`, `dist/`, or `*_logs/`.
 - Skip pre-commit hooks with `--no-verify`.
 - Add backwards-compat shims for code that doesn't exist yet.
-- Leave `console.log` in committed code (except startup banners).
+- Use `console.log/warn/error` in server code. Import `logger` from `server/utils/logger.ts` instead.
 - Write multi-paragraph doc comments — the code should speak for itself.

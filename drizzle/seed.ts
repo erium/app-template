@@ -4,6 +4,7 @@ import pg from "pg";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { tenants, users } from "./schema";
+import { logger } from "../server/utils/logger";
 
 const DATABASE_URL = process.env.DATABASE_URL || "postgresql://app:app@localhost:5432/app_db";
 
@@ -11,7 +12,7 @@ async function seed() {
   const pool = new pg.Pool({ connectionString: DATABASE_URL });
   const db = drizzle(pool);
 
-  console.log("Seeding database...");
+  logger.info("Seeding database...");
 
   // 1. Create default tenant if it doesn't exist
   const slug = "my-org";
@@ -20,7 +21,7 @@ async function seed() {
   let tenantId: number;
   if (existing) {
     tenantId = existing.id;
-    console.log(`✓ Default tenant already exists (ID: ${tenantId})`);
+    logger.info({ tenantId }, "✓ Default tenant already exists");
   } else {
     const [tenant] = await db.insert(tenants).values({
       name: "My Organization",
@@ -28,7 +29,7 @@ async function seed() {
       credits: 100,
     }).returning();
     tenantId = tenant.id;
-    console.log(`✓ Default tenant created (ID: ${tenantId})`);
+    logger.info({ tenantId }, "✓ Default tenant created");
   }
 
   // 2. Create admin user if it doesn't exist
@@ -36,7 +37,7 @@ async function seed() {
   const [existingUser] = await db.select().from(users).where(eq(users.email, adminEmail)).limit(1);
 
   if (existingUser) {
-    console.log("✓ Admin user already exists");
+    logger.info("✓ Admin user already exists");
   } else {
     const defaultPassword = "ChangeMe!2026";
     const passwordHash = bcrypt.hashSync(defaultPassword, 12);
@@ -49,14 +50,14 @@ async function seed() {
       language: "en",
       emailVerified: new Date(),
     });
-    console.log(`✓ Admin user created (${adminEmail} / ${defaultPassword})`);
+    logger.info({ adminEmail, defaultPassword }, "✓ Admin user created");
   }
 
   await pool.end();
-  console.log("Seed complete.");
+  logger.info("Seed complete.");
 }
 
 seed().catch((err) => {
-  console.error("Seed failed:", err);
+  logger.error({ err }, "Seed failed");
   process.exit(1);
 });

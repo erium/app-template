@@ -2,6 +2,7 @@ import { eq, and, desc, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import pg from "pg";
 import * as schema from "../drizzle/schema";
+import { logger } from "./utils/logger";
 import {
   users, InsertUser,
   tenants, InsertTenant,
@@ -15,7 +16,7 @@ const pool = new pg.Pool({ connectionString: DATABASE_URL });
 export const db = drizzle(pool, { schema });
 
 export async function initializeDatabase() {
-  console.log("Database initialized via migration scripts");
+  logger.info("Database initialized via migration scripts");
 }
 
 // ─── TENANT OPERATIONS ───
@@ -206,7 +207,7 @@ export async function createTransaction(data: InsertTransaction) {
 
 // ─── TENANT DELETION ───
 export async function deleteTenantFull(tenantId: number) {
-  console.log(`[Delete Tenant] Starting full delete for tenant ${tenantId}`);
+  logger.info({ tenantId }, "[Delete Tenant] Starting full delete");
 
   await db.transaction(async (tx) => {
     await tx.delete(schema.invitations).where(eq(schema.invitations.tenantId, tenantId));
@@ -214,5 +215,5 @@ export async function deleteTenantFull(tenantId: number) {
     await tx.delete(schema.tenants).where(eq(schema.tenants.id, tenantId));
   });
 
-  console.log(`[Delete Tenant] Successfully deleted tenant ${tenantId}`);
+  logger.info({ tenantId }, "[Delete Tenant] Successfully deleted");
 }

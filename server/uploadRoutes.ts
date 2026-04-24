@@ -3,15 +3,10 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { nanoid } from "nanoid";
+import { logger } from "./utils/logger";
 
-// LOGGING UTILITY
-const LOG_FILE = path.join(process.cwd(), "upload_debug.log");
-function log(msg: string) {
-  const time = new Date().toISOString();
-  const entry = `[${time}] ${msg}\n`;
-  fs.appendFileSync(LOG_FILE, entry);
-  console.log(entry.trim());
-}
+const uploadLog = logger.child({ module: "upload" });
+const log = (msg: string) => uploadLog.debug(msg);
 
 const UPLOAD_DIR = path.join(process.cwd(), "uploads");
 
@@ -54,7 +49,7 @@ export function registerUploadRoutes(app: express.Express) {
     
     upload.single("file")(req, res, (err) => {
       if (err instanceof multer.MulterError) {
-        log(`Multer Error: ${err.message} (${err.code})`);
+        uploadLog.warn({ err, code: err.code }, "Multer error");
         if (err.code === "LIMIT_FILE_SIZE") {
           return res.status(413).json({ 
             error: "Datei zu groß. Maximum: 1GB",
@@ -63,7 +58,7 @@ export function registerUploadRoutes(app: express.Express) {
         }
         return res.status(400).json({ error: `Upload Fehler: ${err.message}` });
       } else if (err) {
-        log(`General Error: ${err.message}`);
+        uploadLog.error({ err }, "Upload general error");
         return res.status(400).json({ error: err.message });
       }
       log("Multer finished successfully.");
@@ -84,8 +79,8 @@ export function registerUploadRoutes(app: express.Express) {
   });
   
   // Handle connection errors
-  app.use("/api/upload", (err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-    log(`Upload Error Handler: ${err.message || err}`);
+  app.use("/api/upload", (err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    uploadLog.error({ err }, "Upload error handler");
     if (!res.headersSent) {
       res.status(500).json({
         error: "Upload fehlgeschlagen. Bitte versuche es erneut.",

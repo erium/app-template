@@ -30,7 +30,7 @@ import {
 import { useIsMobile } from "@/hooks/useMobile";
 import type { LucideIcon } from "lucide-react";
 import {
-  Coins, Home, LogOut, Settings as SettingsIcon, PanelLeft, Users
+  Coins, Home, LogOut, MessageSquare, Settings as SettingsIcon, PanelLeft, Users
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -56,6 +56,7 @@ const menuGroups: MenuGroup[] = [
     id: "general",
     items: [
       { icon: Home, label: "dashboard", path: "/dashboard" },
+      { icon: MessageSquare, label: "chat_title", path: "/chat-example" },
     ]
   },
   {

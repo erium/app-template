@@ -1,8 +1,9 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
-import { Route, Switch } from "wouter";
+import { Route, Router as WouterRouter, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
+import { BASE_PATH } from "./lib/basePath";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
 import Dashboard from "./pages/Dashboard";
@@ -15,8 +16,9 @@ import AdminUsers from "./pages/AdminUsers";
 import Settings from "./pages/Settings";
 import Billing from "./pages/Billing";
 import VerifyEmail from "./pages/VerifyEmail";
+import ChatExample from "./pages/ChatExample";
 
-function Router() {
+function Routes() {
   return (
     <Switch>
       <Route path="/" component={Home} />
@@ -29,6 +31,7 @@ function Router() {
       <Route path="/register" component={Register} />
       <Route path="/join" component={Join} />
       <Route path="/verify" component={VerifyEmail} />
+      <Route path="/chat-example" component={ChatExample} />
 
       {/* Admin Routes */}
       <Route path="/admin/users" component={AdminUsers} />
@@ -45,7 +48,9 @@ function App() {
       <ThemeProvider defaultTheme="light">
         <TooltipProvider>
           <Toaster />
-          <Router />
+          <WouterRouter base={BASE_PATH}>
+            <Routes />
+          </WouterRouter>
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>

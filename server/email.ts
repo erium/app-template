@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import { APP_NAME } from '@shared/config';
+import { logger } from './utils/logger';
 
 // Email configuration
 const SMTP_HOST = process.env.SMTP_HOST || 'smtp.example.com';
@@ -110,7 +111,7 @@ export async function sendVerificationEmail(email: string, token: string, name?:
   const verifyLink = `${APP_URL}/verify?token=${token}`;
   
   // Log for dev/debugging even if no transport
-  console.log(`[Email] Verification for ${email} (${lang}): ${verifyLink}`);
+  logger.info({ email, lang, verifyLink }, "[Email] Verification link");
 
   if (!transport) {
     return true; // Simulate success in dev
@@ -148,10 +149,10 @@ export async function sendVerificationEmail(email: string, token: string, name?:
 ${t.message}
 ${verifyLink}`
     });
-    console.log(`[Email] Verification sent to ${email}`);
+    logger.info({ email }, "[Email] Verification sent");
     return true;
   } catch (error) {
-    console.error('[Email] Failed to send verification:', error);
+    logger.error({ err: error, email }, "[Email] Failed to send verification");
     return false;
   }
 }
@@ -162,7 +163,7 @@ export async function sendInvitationEmail(email: string, token: string, inviterN
   const t = translations[lang];
   const inviteLink = `${APP_URL}/join?token=${token}`;
   
-  console.log(`[Email] Invitation for ${email} (${lang}): ${inviteLink}`);
+  logger.info({ email, lang, inviteLink }, "[Email] Invitation link");
 
   if (!transport) {
     return true; 
@@ -193,10 +194,10 @@ export async function sendInvitationEmail(email: string, token: string, inviterN
       html: getEmailTemplate(content, lang),
       text: `${t.welcome}\n\n${t.inviteMessage}\n${inviteLink}`
     });
-    console.log(`[Email] Invitation sent to ${email}`);
+    logger.info({ email }, "[Email] Invitation sent");
     return true;
   } catch (error) {
-    console.error('[Email] Failed to send invitation:', error);
+    logger.error({ err: error, email }, "[Email] Failed to send invitation");
     return false;
   }
 }
@@ -206,7 +207,7 @@ export async function sendPasswordResetEmail(email: string, token: string, lang:
   const t = translations[lang];
   const resetLink = `${APP_URL}/reset-password?token=${token}`;
   
-  console.log(`[Email] Password Reset for ${email} (${lang}): ${resetLink}`);
+  logger.info({ email, lang, resetLink }, "[Email] Password reset link");
 
   if (!transport) {
     return true; 
@@ -237,10 +238,10 @@ export async function sendPasswordResetEmail(email: string, token: string, lang:
       html: getEmailTemplate(content, lang),
       text: `${t.resetSubject}\n\n${t.resetMessage}\n${resetLink}`
     });
-    console.log(`[Email] Reset sent to ${email}`);
+    logger.info({ email }, "[Email] Reset sent");
     return true;
   } catch (error) {
-    console.error('[Email] Failed to send reset:', error);
+    logger.error({ err: error, email }, "[Email] Failed to send reset");
     return false;
   }
 }

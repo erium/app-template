@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from "express";
 import { z } from "zod";
 import { generatePdfFromHtml } from "../pdfExport";
 import { requireAuth } from "../middleware/auth";
+import { logger } from "../utils/logger";
 
 const router = Router();
 
@@ -24,7 +25,7 @@ router.post("/pdf", async (req: Request, res: Response) => {
     res.setHeader("Content-Disposition", "attachment; filename=export.pdf");
     res.send(pdf);
   } catch (err) {
-    console.error("[Export] PDF generation error:", err);
+    logger.error({ err }, "[Export] PDF generation error");
     res.status(500).json({ error: "PDF generation failed" });
   }
 });

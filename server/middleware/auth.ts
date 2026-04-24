@@ -1,8 +1,10 @@
 import type { Request, Response, NextFunction } from "express";
 import { authService } from "../_core/auth";
 
-// Extend Express Request to carry the authenticated user
+// Extend Express Request to carry the authenticated user.
+// The `Express` namespace is the canonical augmentation target for express types.
 declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace Express {
     interface Request {
       user?: {

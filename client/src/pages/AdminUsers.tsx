@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Loader2, Trash2, UserPlus, Shield, User, Eye, Edit, Link, XCircle, RotateCcw , Mail } from "lucide-react";
+import { Loader2, Trash2, UserPlus, Shield, Eye, Edit, XCircle, Mail } from "lucide-react";
 import DashboardLayout from "@/components/DashboardLayout";
 import { useTranslation } from "react-i18next";
 
@@ -57,7 +57,7 @@ export default function AdminUsers() {
       toast.success(t("invite_revoked"));
       refetchInvites();
     },
-    onError: (err: any) => toast.error(err.message),
+    onError: (err: Error) => toast.error(err.message),
   });
 
   const resendMutation = useMutation({
@@ -65,7 +65,7 @@ export default function AdminUsers() {
     onSuccess: () => {
       toast.success(t("invite_resent"));
     },
-    onError: (err: any) => toast.error(err.message),
+    onError: (err: Error) => toast.error(err.message),
   });
 
   const deleteMutation = useMutation({
@@ -126,7 +126,7 @@ export default function AdminUsers() {
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="role">{t("role")}</Label>
-                            <Select value={inviteRole} onValueChange={(v: any) => setInviteRole(v)}>
+                            <Select value={inviteRole} onValueChange={(v: string) => setInviteRole(v as "viewer" | "editor" | "admin")}>
                                 <SelectTrigger>
                                     <SelectValue placeholder={t("select_role")} />
                                 </SelectTrigger>
@@ -163,7 +163,7 @@ export default function AdminUsers() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {invites.map((invite: any) => (
+                            {invites.map((invite) => (
                                 <TableRow key={invite.id}>
                                     <TableCell className="font-medium text-muted-foreground">{invite.email}</TableCell>
                                     <TableCell className="flex items-center gap-2">
@@ -223,7 +223,7 @@ export default function AdminUsers() {
                                     {getRoleIcon(user.role)}
                                     <Select
                                         defaultValue={user.role}
-                                        onValueChange={(v: any) => updateRoleMutation.mutate({ userId: user.id, role: v })}
+                                        onValueChange={(v: string) => updateRoleMutation.mutate({ userId: user.id, role: v })}
                                         disabled={user.id === me?.id}
                                     >
                                         <SelectTrigger className="h-8 w-[110px]">

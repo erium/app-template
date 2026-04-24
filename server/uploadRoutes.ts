@@ -84,12 +84,12 @@ export function registerUploadRoutes(app: express.Express) {
   });
   
   // Handle connection errors
-  app.use("/api/upload", (err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  app.use("/api/upload", (err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
     log(`Upload Error Handler: ${err.message || err}`);
     if (!res.headersSent) {
-      res.status(500).json({ 
+      res.status(500).json({
         error: "Upload fehlgeschlagen. Bitte versuche es erneut.",
-        details: err.message 
+        details: err.message
       });
     }
   });

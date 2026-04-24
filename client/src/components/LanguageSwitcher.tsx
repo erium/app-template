@@ -9,7 +9,6 @@ import {
 import { api, queryKeys } from '@/lib/api';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/_core/hooks/useAuth';
-import { useState, useEffect } from 'react';
 
 interface LanguageSwitcherProps {
   variant?: 'default' | 'ghost' | 'outline';
@@ -18,7 +17,7 @@ interface LanguageSwitcherProps {
 }
 
 export function LanguageSwitcher({ variant = 'ghost', showLabel = false, className = '' }: LanguageSwitcherProps) {
-  const { i18n, t } = useTranslation();
+  const { i18n } = useTranslation();
   const { user } = useAuth();
 
   const queryClient = useQueryClient();

@@ -14,7 +14,7 @@ if (!fs.existsSync(UPLOAD_DIR)) {
 export async function storagePut(
   relKey: string,
   data: Buffer | Uint8Array | string,
-  contentType = "application/octet-stream"
+  _contentType = "application/octet-stream"
 ): Promise<{ key: string; url: string }> {
   try {
     // Generate a unique filename

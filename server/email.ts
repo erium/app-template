@@ -159,8 +159,7 @@ ${verifyLink}`
 
 export async function sendInvitationEmail(email: string, token: string, inviterName?: string, lang: 'de' | 'en' = 'de'): Promise<boolean> {
   const transport = getTransporter();
-  // Cast to any to avoid TS errors if types aren't perfect for the new keys yet
-  const t = translations[lang] as any; 
+  const t = translations[lang];
   const inviteLink = `${APP_URL}/join?token=${token}`;
   
   console.log(`[Email] Invitation for ${email} (${lang}): ${inviteLink}`);
@@ -204,7 +203,7 @@ export async function sendInvitationEmail(email: string, token: string, inviterN
 
 export async function sendPasswordResetEmail(email: string, token: string, lang: 'de' | 'en' = 'de'): Promise<boolean> {
   const transport = getTransporter();
-  const t = translations[lang] as any;
+  const t = translations[lang];
   const resetLink = `${APP_URL}/reset-password?token=${token}`;
   
   console.log(`[Email] Password Reset for ${email} (${lang}): ${resetLink}`);

@@ -8,11 +8,10 @@ import { api } from "@/lib/api";
 import { useMutation } from "@tanstack/react-query";
 import { Loader2, UserPlus, Building2, MailCheck, Brain } from "lucide-react";
 import { useState } from "react";
-import { useLocation, Link } from "wouter";
+import { Link } from "wouter";
 import { toast } from "sonner";
 
 export default function Register() {
-  const [, setLocation] = useLocation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");

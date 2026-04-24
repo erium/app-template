@@ -6,7 +6,14 @@ import globals from "globals";
 
 export default tseslint.config(
   {
-    ignores: ["dist/", "build/", "data/", "node_modules/", "drizzle/migrations/"],
+    ignores: [
+      "dist/",
+      "build/",
+      "data/",
+      "node_modules/",
+      "drizzle/migrations/",
+      "client/src/components/ui/",
+    ],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,

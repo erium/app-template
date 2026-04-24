@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { api, queryKeys } from "@/lib/api";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Loader2, UserCheck } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 
@@ -14,18 +14,14 @@ export default function Join() {
   const { t } = useTranslation();
 
   const [, setLocation] = useLocation();
-  const [token, setToken] = useState("");
+  const [token] = useState<string>(() => {
+    if (typeof window === "undefined") return "";
+    return new URLSearchParams(window.location.search).get("token") ?? "";
+  });
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
 
   const queryClient = useQueryClient();
-
-  // Extract token from URL
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const t = params.get("token");
-    if (t) setToken(t);
-  }, []);
 
   const joinMutation = useMutation({
     mutationFn: api.join,

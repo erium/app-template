@@ -70,14 +70,14 @@ router.post("/register", async (req: Request, res: Response) => {
     const passwordHash = await bcrypt.hash(input.password, 12);
     const verificationToken = randomUUID();
 
-    const { user } = await db.createTenantWithAdmin(input.companyName, {
+    await db.createTenantWithAdmin(input.companyName, {
       email: input.email,
       passwordHash,
       name: input.name,
       language: "de",
       verificationToken,
       emailVerified: null,
-    } as any);
+    });
 
     sendVerificationEmail(input.email, verificationToken, input.name).catch(
       (e) => console.error("Failed to send verification email:", e),
@@ -213,7 +213,7 @@ router.post("/join", async (req: Request, res: Response) => {
       email: invitation.email,
       passwordHash,
       name: input.name,
-      role: invitation.role as any,
+      role: invitation.role,
       tenantId: invitation.tenantId,
       language: "de",
       emailVerified: new Date(),
@@ -261,7 +261,7 @@ router.post("/forgot-password", async (req: Request, res: Response) => {
     expires.setHours(expires.getHours() + 1); // 1 hour validity
 
     await db.setPasswordResetToken(user.id, token, expires);
-    await sendPasswordResetEmail(user.email, token, user.language as any);
+    await sendPasswordResetEmail(user.email, token, (user.language ?? "de") as "de" | "en");
 
     res.json({ success: true });
   } catch (err) {

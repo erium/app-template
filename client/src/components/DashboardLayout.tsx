@@ -28,15 +28,16 @@ import {
   SidebarSeparator,
 } from "@/components/ui/sidebar";
 import { useIsMobile } from "@/hooks/useMobile";
+import type { LucideIcon } from "lucide-react";
 import {
   Coins, Home, LogOut, Settings as SettingsIcon, PanelLeft, Users
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
-import { useLocation, Link } from "wouter";
+import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 
 type MenuItem = {
-  icon: any;
+  icon: LucideIcon;
   label: string;
   path: string;
   roles?: string[];
@@ -91,14 +92,13 @@ export default function DashboardLayout({
     localStorage.setItem(SIDEBAR_WIDTH_KEY, sidebarWidth.toString());
   }, [sidebarWidth]);
 
-  if (loading) {
-    return <DashboardLayoutSkeleton />;
-  }
-
-  if (!user) {
-    if (typeof window !== "undefined") {
+  useEffect(() => {
+    if (!loading && !user && typeof window !== "undefined") {
       window.location.href = "/login";
     }
+  }, [loading, user]);
+
+  if (loading || !user) {
     return <DashboardLayoutSkeleton />;
   }
 
@@ -141,6 +141,7 @@ function DashboardLayoutContent({
   const effectiveRole = (userRole as string) === 'creator' ? 'editor' : (userRole as string) === 'consumer' ? 'viewer' : userRole;
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (isCollapsed) setIsResizing(false);
   }, [isCollapsed]);
 

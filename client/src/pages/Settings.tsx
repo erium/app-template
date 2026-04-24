@@ -12,7 +12,6 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { api, queryKeys } from "@/lib/api";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
 
@@ -20,7 +19,6 @@ export default function Settings() {
   const { t } = useTranslation();
   const { user } = useAuth();
 
-  const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
 
   // Tenant Settings Logic
@@ -32,6 +30,7 @@ export default function Settings() {
 
   useEffect(() => {
     if (tenantQuery.data?.name) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setTenantName(tenantQuery.data.name);
     }
   }, [tenantQuery.data]);

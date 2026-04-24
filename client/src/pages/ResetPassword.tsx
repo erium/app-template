@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
 import { useForm } from "react-hook-form";
@@ -37,16 +37,13 @@ const formSchema = z.object({
 
 export default function ResetPassword() {
   const { t } = useTranslation();
-  const [location, setLocation] = useLocation();
+  const [, setLocation] = useLocation();
 
   // Extract token from URL manually since wouter doesn't parse query params automatically in useRoute
-  const [token, setToken] = useState<string | null>(null);
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const t = params.get("token");
-    if (t) setToken(t);
-  }, []);
+  const [token] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    return new URLSearchParams(window.location.search).get("token");
+  });
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, react-hooks/unsupported-syntax */
 import { useRef } from "react";
 
 type noop = (...args: any[]) => any;

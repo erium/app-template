@@ -74,9 +74,11 @@ export function serveStatic(app: Express) {
     logger.error({ distPath }, "Could not find the build directory — build the client first");
   }
 
-  app.use(express.static(distPath));
+  // index: false — prevent express.static from serving index.html directly for GET /.
+  // Without this, the <base href> injection in the fallthrough handler below is skipped.
+  app.use(express.static(distPath, { index: false }));
 
-  // fall through to index.html (with injected <base href>) if the file doesn't exist
+  // fall through to index.html (with injected <base href>) for all non-asset requests
   app.use("*", (req, res) => {
     const indexPath = path.resolve(distPath, "index.html");
     fs.readFile(indexPath, "utf-8", (err, html) => {

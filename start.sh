@@ -120,14 +120,15 @@ if [ ! -d node_modules ]; then
   log "Installing dependencies..."
   pnpm install --frozen-lockfile 2>&1 | tail -3
 fi
-# Schema strategy for runners:
-#   1. db:migrate — applies ordered SQL migration files and tracks them in
-#      __drizzle_migrations. Vibe-coder-generated migrations are picked up here.
-#   2. db:push --force — safety net: syncs any schema.ts changes that exist but
-#      haven't been captured in a migration file yet. Runs after migrate so the
-#      DB is already in sync and push becomes a no-op in the happy path.
-log "Applying migrations..."
-pnpm db:migrate >> "$LOG" 2>&1 || true
+# Schema strategy: push --force is the only schema tool on runners.
+# db:migrate is not idempotent — it fails whenever pg-data is in any partial
+# state (tables exist from a previous push without a journal entry, or a
+# previous migrate that only partially completed). push --force diffs
+# schema.ts against the live DB and applies exactly what is missing,
+# regardless of history. It also handles vibe-coder schema changes: any
+# edit to schema.ts (which always accompanies a generated migration) is
+# picked up by push automatically.
+# For production deployments with real data, run pnpm db:migrate separately.
 log "Syncing schema..."
 pnpm exec drizzle-kit push --force >> "$LOG" 2>&1 || true
 log "Seeding..."

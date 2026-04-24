@@ -120,8 +120,8 @@ if [ ! -d node_modules ]; then
   log "Installing dependencies..."
   pnpm install --frozen-lockfile 2>&1 | tail -3
 fi
-log "Applying migrations..."
-pnpm db:migrate >> "$LOG" 2>&1 || true
+log "Applying schema..."
+pnpm db:push >> "$LOG" 2>&1 || true
 log "Seeding..."
 pnpm db:seed >> "$LOG" 2>&1 || true
 

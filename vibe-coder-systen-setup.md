@@ -64,24 +64,3 @@ Autonomous execution can sometimes lead to destructive loops. You must actively 
 **Proactivity & Auto-Run:**
 *   **Starting the Loop:** Use the `control_loop` function with `action="start"` when the user explicitly tells you to start autonomously, or once it is clear that the requirements discussion with the user is over and the actual implementation phase shall begin.
 *   **Continuous Execution:** You can perform up to 30 tool calls before reporting back. As long as you are making verifiable progress and your plan is updated, continue working. If you hit a wall, stop, evaluate, and email the user.
-
----
-
-### Summary of Changes
-
-Here's what was added and why:
-
-| Addition | Location | Purpose |
-|---|---|---|
-| **Project Path & Application Template** | Environment Context (new bullet) | Tells the bot it will receive a project path with a template and must build on it — not from scratch. Points to the public GitHub source `erium/app-template`. |
-| **Cloning the Template (FIRST STEP)** | Environment Context (new bullet) | Explicit clone workflow: check long-term memory first, then clone if absent, then record the clone in memory. Prevents re-cloning on session resume (which would overwrite user changes) and gives a concrete `git clone` command for the public repo. |
-| **LLM.txt — Your Essential Starting Point** | Environment Context (new bullet, marked CRITICAL) | Establishes `LLM.txt` as the **mandatory first read** after the template is present. Explains what it contains (architecture, conventions, docs, template usage, development guidance) and that it acts as a table-of-contents pointing to deeper documents. |
-| **Initialization order** | Section 1 (Session Planning) — Initialization sub-bullet | Orders the startup sequence as: verify/clone template → read `LLM.txt` → record user → build plan. |
-| **Template clone state as memory entry** | Section 5 (Long-Term Memory) | Makes recording + checking the clone state a mandatory memory operation so the bot does not re-clone on subsequent sessions. |
-
-The key design decisions:
-
-1. **"CRITICAL" labeling** — mirrors the existing convention used for Session Planning, signaling to the model that this is non-negotiable.
-2. **Explicit "drill-deeper" language** — tells the bot that `LLM.txt` is a hub, not the whole story. It should follow references to topic-specific docs (architecture, conventions, etc.) as needed for the current task.
-3. **Integrated into the initialization flow** — rather than being a standalone instruction, the `LLM.txt` read is woven into the existing Session Planning initialization step, creating a natural sequence: *verify/clone template → read LLM.txt → extract user info → build plan*.
-4. **Clone-once, remember-forever** — the template clone is guarded by a long-term memory check. This avoids the common failure mode where an agent re-clones on every session resume, destroying user edits. The memory entry is keyed on project path and records the commit SHA so later sessions can detect when the template has diverged.

@@ -120,11 +120,15 @@ if [ ! -d node_modules ]; then
   log "Installing dependencies..."
   pnpm install --frozen-lockfile 2>&1 | tail -3
 fi
-# db:push (not db:migrate) — runners are dev/demo environments where data is not
-# worth preserving. push diffs schema.ts against the live DB and applies whatever
-# is missing; it handles out-of-sync journal state and works without a TTY.
-# Production deployments with real data must run db:migrate in their own pipeline.
-log "Applying schema..."
+# Schema strategy for runners:
+#   1. db:migrate — applies ordered SQL migration files and tracks them in
+#      __drizzle_migrations. Vibe-coder-generated migrations are picked up here.
+#   2. db:push --force — safety net: syncs any schema.ts changes that exist but
+#      haven't been captured in a migration file yet. Runs after migrate so the
+#      DB is already in sync and push becomes a no-op in the happy path.
+log "Applying migrations..."
+pnpm db:migrate >> "$LOG" 2>&1 || true
+log "Syncing schema..."
 pnpm db:push -- --force >> "$LOG" 2>&1 || true
 log "Seeding..."
 pnpm db:seed >> "$LOG" 2>&1 || true

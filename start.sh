@@ -120,6 +120,10 @@ if [ ! -d node_modules ]; then
   log "Installing dependencies..."
   pnpm install --frozen-lockfile 2>&1 | tail -3
 fi
+# db:push (not db:migrate) — runners are dev/demo environments where data is not
+# worth preserving. push diffs schema.ts against the live DB and applies whatever
+# is missing; it handles out-of-sync journal state and works without a TTY.
+# Production deployments with real data must run db:migrate in their own pipeline.
 log "Applying schema..."
 pnpm db:push -- --force >> "$LOG" 2>&1 || true
 log "Seeding..."

@@ -43,7 +43,9 @@ test:
 
 deploy_github:
   stage: deploy
-  image: alpine/git:latest
+  image:
+    name: alpine/git:latest
+    entrypoint: [""]
   script:
     - git config --global user.email "hal@erium.ai"
     - git config --global user.name "Halerium"

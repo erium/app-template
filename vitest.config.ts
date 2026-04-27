@@ -4,6 +4,9 @@ import path from "node:path";
 const root = path.resolve(import.meta.dirname);
 
 export default defineConfig({
+  esbuild: {
+    jsx: "automatic",
+  },
   resolve: {
     alias: {
       "@": path.resolve(root, "src"),

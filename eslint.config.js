@@ -9,6 +9,7 @@ export default tseslint.config(
     ignores: [
       "dist/",
       ".next/",
+      "next-env.d.ts",
       "data/",
       "node_modules/",
       "drizzle/migrations/",

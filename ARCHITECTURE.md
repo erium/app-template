@@ -11,21 +11,18 @@ A single-file overview of how this template is assembled. ASCII diagrams so it r
                                    │ HTTPS
                                    ▼
                     ┌───────────────────────────┐
-                    │   React SPA (Vite build)  │
-                    │   wouter routing          │
+                    │   Next.js App (App Router)│
+                    │   app/*/page.tsx routing  │
                     │   React Query + api.ts    │
                     └─────────────┬─────────────┘
                                   │ fetch  /api/*
                                   │ cookie: app_session_id (JWT)
                                   ▼
                     ┌───────────────────────────┐
-                    │       Express Server      │
-                    │  webhookRouter (raw body) │
-                    │  express.json             │
-                    │  authenticateUser         │
-                    │  /api/* routers           │
-                    │  /uploads static          │
-                    │  Vite middleware (dev)    │
+                    │     Next.js Server        │
+                    │  app/api/*/route.ts       │
+                    │  requireUser/requireAdmin │
+                    │  /api/uploads/* (static)  │
                     └──┬─────────────┬────────┬─┘
                        │             │        │
                 ┌──────┴──────┐  ┌───┴────┐  ┌┴───────────┐
@@ -40,12 +37,12 @@ A single-file overview of how this template is assembled. ASCII diagrams so it r
               └──────────────┘  └────────┘  └────────┘
 
               ┌──────────────┐  ┌─────────────────────┐
-              │  uploads/    │  │  Playwright + FFprobe
-              │  (multer)    │  │  (PDF export / probes)
+              │  uploads/    │  │  Playwright          │
+              │  (formData)  │  │  (PDF export)        │
               └──────────────┘  └─────────────────────┘
 ```
 
-The SPA and API are a single Node process. In dev, Vite middleware serves the client; in prod, Express serves `dist/public/`.
+The frontend and API run as a single Next.js process. In dev, `next dev` serves everything with HMR; in prod, `next build` + `next start`.
 
 ## Request Lifecycle
 
@@ -55,19 +52,22 @@ The SPA and API are a single Node process. In dev, Vite middleware serves the cl
 └──────────────────────────────────────┬──────────────────────────────┘
                                        │
                                        ▼
-┌─── Express ─────────────────────────────────────────────────────────┐
-│  1. webhookRouter   (skipped: not /api/webhook/stripe)               │
-│  2. express.json    (parse JSON body)                                │
-│  3. authenticateUser                                                 │
-│       ├── read app_session_id cookie                                 │
-│       ├── verify JWT with JWT_SECRET (jose)                          │
-│       └── populate req.user (id, email, tenantId, role, …)           │
-│  4. Router match:  /api/tenant → tenantRouter                        │
-│  5. router.use(requireAuth)   → 401 if !req.user                     │
-│  6. handler:                                                         │
-│       ├── zod.parse(req.body | req.params)                           │
-│       ├── await db.getTenantById(req.user.tenantId)                  │
-│       └── res.json({ … })                                            │
+┌─── Next.js Route Handler ───────────────────────────────────────────┐
+│   app/api/tenant/settings/route.ts  GET handler                      │
+│                                                                      │
+│  try {                                                               │
+│    1. requireUser(request)                                           │
+│         ├── parse app_session_id cookie                              │
+│         ├── verify JWT with JWT_SECRET (jose)                        │
+│         ├── fetch user from DB + match tenantId                      │
+│         └── throws Response(401) if any check fails                  │
+│    2. zod.parse(body | params)                                       │
+│    3. await db.getTenantById(user.tenantId)                          │
+│    4. return NextResponse.json({ … })                                │
+│  } catch (err) {                                                     │
+│    if (err instanceof Response) return err   ← 401/403               │
+│    return NextResponse.json({ error }, { status: 500 })              │
+│  }                                                                   │
 └──────────────────────────────────────┬──────────────────────────────┘
                                        │
                                        ▼
@@ -81,7 +81,7 @@ The SPA and API are a single Node process. In dev, Vite middleware serves the cl
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-On failure, handlers `return res.status(4xx|5xx).json({ error })`. The `authenticateUser` middleware never rejects — `requireAuth` and `requireAdmin` are the gates.
+Auth helpers live in `src/server/getUser.ts`. `requireUser` throws a `Response(401)`; `requireAdmin` throws `Response(403)`. The `catch` block returns the thrown Response unchanged.
 
 ## Authentication Flow
 
@@ -91,7 +91,7 @@ Register
 User ─┬─ POST /api/auth/register { email, password, name, companyName }
       │
       ▼
-Express ── createTenantWithAdmin() (one tx: tenant + admin user)
+Route Handler ── createTenantWithAdmin() (one tx: tenant + admin user)
       │   emailVerified: null
       │   verificationToken: randomUUID()
       ▼
@@ -131,11 +131,11 @@ Subsequent Request
 fetch("/api/...", { credentials: "include" })
       │   Cookie: app_session_id=<JWT>
       ▼
-authenticateUser → jose.jwtVerify(JWT, JWT_SECRET)
-                → populate req.user
+requireUser(request) → parse cookie → jose.jwtVerify(JWT, JWT_SECRET)
+                     → fetch user from DB → verify tenantId match
       │
       ▼
-requireAuth / requireAdmin → handler
+handler logic → NextResponse.json({ … })
 ```
 
 The JWT is the full session. There is no server-side session store. Invalidation is time-based (1-year TTL) + client-side logout clears the cookie.
@@ -168,13 +168,13 @@ The JWT is the full session. There is no server-side session store. Invalidation
 
 ### Authorization tiers
 
-| Tier | Middleware | Example endpoints |
+| Tier | Helper | Example endpoints |
 |---|---|---|
 | Public | — | `POST /api/auth/login`, `POST /api/auth/register` |
-| Protected | `requireAuth` | `GET /api/auth/me`, `POST /api/payment/checkout`, `POST /api/export/pdf` |
-| Admin | `requireAuth` + `requireAdmin` | `POST /api/tenant/invite`, `PUT /api/tenant/name`, `DELETE /api/tenant` |
+| Protected | `requireUser(request)` | `GET /api/auth/me`, `POST /api/payment/checkout`, `POST /api/export/pdf` |
+| Admin | `requireAdmin(request)` | `POST /api/tenant/invite`, `PUT /api/tenant/name`, `DELETE /api/tenant` |
 
-Routers apply the tier once via `router.use(requireAuth)` and add `requireAdmin` on individual handlers when needed. Role checks are middleware-only — never in handler bodies.
+Each Route Handler calls the appropriate helper explicitly. Role checks are always via these helpers — never inline in handler bodies.
 
 ## File Upload
 
@@ -185,17 +185,17 @@ User drops file in UI
 POST /api/upload   multipart/form-data, field "file"
       │
       ▼
-registerUploadRoutes (server/uploadRoutes.ts)
-  ├── multer.diskStorage → writes to uploads/<nanoid><.ext>
-  ├── limit: 1 GB, timeout: 30 min
+app/api/upload/route.ts
+  ├── await request.formData() → formData.get("file")
+  ├── writes to uploads/<nanoid><.ext>
   └── 200 { url: "/uploads/<filename>", filename, originalName }
                                   │
                                   ▼
-Express.static("/uploads", UPLOAD_DIR) serves the file back.
+app/api/uploads/[...path]/route.ts serves the file back (streams from uploads/).
 ```
 
 - `uploads/` is `.gitignored`. Nothing touches DB from this flow — URLs are stored by whatever feature needs them.
-- The `/api/upload` endpoint is not behind `requireAuth` today; add the middleware before handing it to users if you don't want open uploads.
+- The `/api/upload` endpoint is not behind `requireUser` today; add the helper before handing it to users if you don't want open uploads.
 
 ## PDF Export
 
@@ -208,7 +208,7 @@ Client: const pdfBytes = await (await fetch("/api/export/pdf", {
         })).arrayBuffer();
       │
       ▼
-/api/export/pdf  (router.use(requireAuth))
+app/api/export/pdf/route.ts  (requireUser)
   ├── zod: { html: string.min(1) }
   └── generatePdfFromHtml(html)  (server/pdfExport.ts)
          ├── launch headless Chromium (Playwright)
@@ -217,9 +217,10 @@ Client: const pdfBytes = await (await fetch("/api/export/pdf", {
          └── return Buffer
       │
       ▼
-res.setHeader("Content-Type", "application/pdf")
-res.setHeader("Content-Disposition", "attachment; filename=export.pdf")
-res.send(pdf)
+new Response(new Uint8Array(pdf), {
+  headers: { "Content-Type": "application/pdf",
+             "Content-Disposition": "attachment; filename=export.pdf" }
+})
 ```
 
 The endpoint is deliberately minimal — the caller supplies the HTML. Build templates client-side (or in a dedicated helper) and POST the rendered string. Keeps Playwright out of the routes layer.
@@ -227,7 +228,9 @@ The endpoint is deliberately minimal — the caller supplies the HTML. Build tem
 ## Stripe Webhook (Payments)
 
 ```
-Stripe → POST /api/webhook/stripe   (raw body, registered BEFORE express.json)
+Stripe → POST /api/webhook/stripe
+  app/api/webhook/stripe/route.ts
+  ├── const rawBody = await request.text()
   ├── stripe.webhooks.constructEvent(rawBody, signature, STRIPE_WEBHOOK_SECRET)
   ├── event.type === "checkout.session.completed":
   │     ├── db.getTransactionByStripeSessionId(sessionId)  (idempotency)
@@ -236,7 +239,7 @@ Stripe → POST /api/webhook/stripe   (raw body, registered BEFORE express.json)
   └── 200 { received: true }
 ```
 
-Stripe requires the raw body to verify signatures. `webhookRouter` is mounted before the JSON body parser for that reason — see `server/_core/index.ts`.
+Stripe requires the raw body to verify signatures. `request.text()` reads the body before any JSON parsing — this works natively in Next.js Route Handlers.
 
 ## Further Reading
 

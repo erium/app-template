@@ -17,7 +17,7 @@ These are the source of truth.
 | What | Convention | Example |
 |---|---|---|
 | React components | PascalCase | `DashboardLayout.tsx` |
-| Pages (files in `client/src/pages/`) | PascalCase | `AdminUsers.tsx` |
+| Views (files in `src/views/`) | PascalCase | `AdminUsers.tsx` |
 | Hooks | `use*` camelCase | `useAuth.ts` |
 | Other TS files | camelCase | `pdfExport.ts`, `webhookRoutes.ts` |
 | Functions / variables | camelCase | `getUserByEmail` |
@@ -28,23 +28,30 @@ These are the source of truth.
 ## File Organization
 
 ```
-client/src/
-  pages/          One file per route in App.tsx
+app/
+  layout.tsx, providers.tsx    Root layout (server component) and client providers
+  */page.tsx                   Thin page wrappers — re-export from src/views/
+  not-found.tsx                404 page
+  api/*/route.ts               Route Handlers — one file per endpoint group
+
+src/
+  views/          One file per App Router route ("use client" components)
   components/     Reusable components (DashboardLayout, ErrorBoundary, …)
   components/ui/  shadcn primitives — don't hand-edit, regenerate via shadcn CLI
-  lib/            api.ts (typed fetch wrapper), i18n.ts, utils.ts
+  lib/            api.ts (typed fetch wrapper), basePath.ts, i18n.ts, utils.ts
+  server/
+    getUser.ts    Auth helpers for Route Handlers (getUser, requireUser, requireAdmin)
   _core/hooks/    Cross-cutting hooks (useAuth)
   locales/        i18n resources (de/, en/)
 
 server/
-  _core/          Entry point, env, cookies, vite dev middleware
-  middleware/     Express middleware (auth.ts)
-  routes/         REST endpoints grouped by resource (auth, tenant, payment, export)
+  _core/          env.ts, auth.ts (JWT sign/verify), cookies.ts
+  utils/          logger.ts (pino) — use this, not console
   db.ts           All Drizzle queries live here — route handlers call these helpers
   email.ts        Nodemailer transport + email templates
   stripe.ts       Stripe client
   pdfExport.ts    Playwright HTML→PDF
-  webhookRoutes.ts Stripe webhook (registered BEFORE json body parser)
+  storage.ts      Local file storage helpers
 
 drizzle/
   schema.ts       Tables, columns, types
@@ -54,6 +61,8 @@ drizzle/
 shared/
   config.ts       APP_NAME, APP_DESCRIPTION, SUPPORT_EMAIL
   const.ts        COOKIE_NAME, time constants
+
+public/           Static assets (favicon.svg, etc.)
 ```
 
 ## Components
@@ -63,23 +72,30 @@ shared/
 - All user-facing strings go through `useTranslation()` → i18n keys. No hardcoded copy.
 - Use `useAuth()` for session state; do not call `/api/auth/me` directly.
 - Toast feedback via `sonner` (`toast.success`, `toast.error`). Don't use browser `alert`.
-- Client-side routing via `wouter` (`Link`, `useLocation`). Don't add `react-router`.
+- Client-side routing via `next/link` (`Link`) and `next/navigation` (`useRouter`, `usePathname`). Don't add wouter or react-router.
+- All page components in `src/views/` must have `"use client"` at the top. Guard any `localStorage`/`window` access with `if (typeof window === "undefined")` — Next.js SSRs client components for the initial HTML.
 
 ## API Routes
 
-- One file per resource under `server/routes/`. Export an Express `Router`.
-- Register the router in `server/routes/index.ts` — never import route files into the entry point directly.
-- Apply auth at the router level when every handler needs it:
+- One file per endpoint group under `app/api/`. Export named functions (`GET`, `POST`, `PUT`, `DELETE`).
+- Import `requireUser` or `requireAdmin` from `src/server/getUser.ts` — never inline auth logic.
+- Both helpers throw a `Response` object. Wrap the handler body in try/catch:
   ```ts
-  router.use(requireAuth);
-  router.put("/users/:id/role", requireAdmin, handler);
+  export async function GET(request: Request) {
+    try {
+      const user = await requireUser(request);
+      const body = schema.parse(await request.json()); // for POST/PUT
+      const result = await db.someHelper(user.tenantId);
+      return NextResponse.json(result);
+    } catch (err) {
+      if (err instanceof Response) return err;
+      logger.error({ err }, "[Resource] handler error");
+      return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    }
+  }
   ```
-- Validate the body with zod before using it:
-  ```ts
-  const body = schema.parse(req.body);
-  ```
-- On success, return JSON. On failure, return `{ error: string }` with a 4xx/5xx status. Let middleware catch thrown errors.
-- Log errors with context: `console.error("[Tenant] getSettings error:", err)`.
+- Validate the body with zod before using it. On success, return `NextResponse.json(data)`. On validation failure, zod throws and the catch block returns 500 — catch `ZodError` explicitly if you want a 400.
+- Log errors with `logger` from `server/utils/logger.ts` (never `console.*`).
 
 ## DB Operations
 
@@ -97,7 +113,7 @@ shared/
 
 ## Client API Pattern
 
-- Only call the server through `api.*` from `client/src/lib/api.ts`. Never call `fetch` directly in components.
+- Only call the server through `api.*` from `src/lib/api.ts`. Never call `fetch` directly in components.
 - Data fetching uses `@tanstack/react-query`:
   ```ts
   useQuery({ queryKey: queryKeys.me, queryFn: api.getMe });
@@ -113,13 +129,13 @@ shared/
 
 ## Auth Patterns
 
-Three tiers, applied via middleware from `server/middleware/auth.ts`:
+Three tiers, enforced per-handler via helpers from `src/server/getUser.ts`:
 
-- **Public** — no middleware. Login, register, verify email.
-- **Protected** — `requireAuth`. Dashboard, settings, self-service.
-- **Admin** — `requireAuth` + `requireAdmin`. Tenant-wide management.
+- **Public** — no helper call. Login, register, verify email, health check.
+- **Protected** — `const user = await requireUser(request)`. Dashboard, settings, self-service.
+- **Admin** — `const user = await requireAdmin(request)`. Tenant-wide management.
 
-Never check roles inside a handler if middleware can enforce it.
+Both helpers throw a `Response` when access is denied; the `catch (err) { if (err instanceof Response) return err; }` pattern propagates the 401/403 back to the client. Never inline JWT parsing or role checks in handler bodies.
 
 ## Branding & Config
 
@@ -149,8 +165,8 @@ Never check roles inside a handler if middleware can enforce it.
 
 | Script | What it does |
 |---|---|
-| `pnpm dev` | Dev server with Vite + tsx watch |
-| `pnpm build` | Vite client build + esbuild server bundle |
+| `pnpm dev` | Next.js dev server with HMR |
+| `pnpm build` | Next.js production build → `.next/` |
 | `pnpm start` | Run the production bundle |
 | `pnpm check` | TypeScript `--noEmit` |
 | `pnpm lint` / `pnpm lint:fix` | ESLint |
@@ -169,11 +185,12 @@ Schema changes go through `drizzle/schema.ts` → `pnpm db:generate` → review 
 
 Do not:
 
-- Reintroduce tRPC. The API is Express REST by choice.
+- Reintroduce tRPC or Express. The API uses Next.js Route Handlers by design.
 - Add `axios`. Use `fetch` via `api.ts`.
 - Scatter DB queries across route handlers. Put them in `server/db.ts`.
 - Hardcode copy. Use i18n keys.
-- Commit `.env`, `pg-data/`, `uploads/`, `data/`, `dist/`, or `*_logs/`.
+- Access `localStorage` or `window` at component top level — guard with `if (typeof window === "undefined")`.
+- Commit `.env`, `pg-data/`, `uploads/`, `data/`, `.next/`, or `*_logs/`.
 - Skip pre-commit hooks with `--no-verify`.
 - Add backwards-compat shims for code that doesn't exist yet.
 - Use `console.log/warn/error` in server code. Import `logger` from `server/utils/logger.ts` instead.

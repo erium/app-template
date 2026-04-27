@@ -77,9 +77,9 @@ graph LR
         Fetch["fetch()<br/>credentials: include"]
     end
 
-    subgraph Server["Express Server"]
-        MW["Middleware<br/>(auth, body parser)"]
-        Handler["Route Handler"]
+    subgraph Server["Next.js Route Handlers"]
+        MW["Auth Helper<br/>requireUser / requireAdmin"]
+        Handler["Route Handler<br/>(app/api/*/route.ts)"]
         Service["Service Layer<br/>(email, stripe, pdf)"]
         ORM["Drizzle ORM"]
     end
@@ -92,7 +92,7 @@ graph LR
     UI -->|"User action"| RQ
     RQ -->|"Query / Mutation"| Fetch
     Fetch -->|"HTTP + cookie"| MW
-    MW -->|"req.user"| Handler
+    MW -->|"AuthUser"| Handler
     Handler --> ORM
     Handler --> Service
     ORM -->|"SQL"| DB
@@ -152,12 +152,12 @@ stateDiagram-v2
 
     Cookie --> Verified: Each request
     note right of Verified
-        authenticateUser middleware:
-        1. Read cookie
+        requireUser(request):
+        1. Parse cookie header
         2. Verify JWT signature (HS256)
         3. Fetch user from DB
         4. Match tenantId
-        5. Populate req.user
+        5. Return AuthUser (or throw 401)
     end note
 
     Verified --> Active: Valid
@@ -188,7 +188,7 @@ graph TD
         TxList["Transaction history"]
     end
 
-    subgraph API["Express API"]
+    subgraph API["Route Handlers"]
         Checkout["POST /api/payment/checkout<br/>Create Stripe session"]
         WebhookH["POST /api/webhook/stripe<br/>Handle payment event"]
         TxGet["GET /api/payment/transactions"]
@@ -229,7 +229,7 @@ How multi-tenancy is enforced at the data level.
 graph TD
     subgraph Auth["Authentication Layer"]
         JWT["JWT Payload<br/>{userId, email, tenantId}"]
-        MW["authenticateUser<br/>Verifies token.tenantId<br/>matches user.tenantId in DB"]
+        MW["src/server/getUser.ts<br/>Verifies token.tenantId<br/>matches user.tenantId in DB"]
     end
 
     subgraph Queries["Query Scoping"]
@@ -246,7 +246,7 @@ graph TD
     end
 
     JWT --> MW
-    MW -->|"req.user.tenantId"| Queries
+    MW -->|"user.tenantId"| Queries
 
     DelTenant --> DelInvitations
     DelInvitations --> DelUsers
@@ -291,8 +291,8 @@ graph TD
 |----------|-------|
 | **Engine** | PostgreSQL (node-postgres) |
 | **ORM** | Drizzle ORM 0.44 |
-| **DB File** | `data/app.db` (configurable via `DATABASE_URL`) |
-| **Schema Management** | `drizzle-kit push` (schema-first, no migration files) |
+| **Connection** | `postgresql://app:app@localhost:5432/app_db` (configurable via `DATABASE_URL`) |
+| **Schema Management** | `drizzle-kit generate` + `drizzle-kit migrate` (versioned migrations committed to git) |
 | **Transactions** | Used for tenant+user creation, tenant deletion |
 | **Cascade Deletes** | ON DELETE CASCADE on all foreign keys |
 | **Type Safety** | Full TypeScript inference via `$inferSelect` / `$inferInsert` |

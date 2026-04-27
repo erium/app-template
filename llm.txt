@@ -14,21 +14,22 @@ After detaching, add your own remote with `git remote add origin <your-repo-url>
 
 ## What This Is
 
-A generic full-stack TypeScript template: React frontend + Express REST backend + PostgreSQL via Drizzle ORM. Ships with auth, multi-tenancy (tenant → users → invitations), i18n (de/en), Stripe billing, PDF export (Playwright), and 53 shadcn/ui components. Single `package.json` (no monorepo). Branding lives in `shared/config.ts`.
+A generic full-stack TypeScript template: React frontend + Next.js Route Handlers + PostgreSQL via Drizzle ORM. Ships with auth, multi-tenancy (tenant → users → invitations), i18n (de/en), Stripe billing, PDF export (Playwright), and 53 shadcn/ui components. Single `package.json` (no monorepo). Branding lives in `shared/config.ts`.
 
 ## Stack
 
 - **Runtime:** Node 20+, pnpm 10
-- **Frontend:** React 19, Vite 7, wouter 3 (routing), TailwindCSS 4, shadcn/ui, react-hook-form 7, react-i18next 16, @tanstack/react-query 5, sonner (toasts)
-- **Backend:** Express 4, drizzle-orm 0.44 + pg 8 (PostgreSQL), jose 6 (JWT), bcryptjs 3, zod 4, nodemailer 8, stripe 20, playwright 1.58
+- **Frontend:** React 19, Next.js 15 (App Router), TailwindCSS 4, shadcn/ui, react-hook-form 7, react-i18next 16, @tanstack/react-query 5, sonner (toasts)
+- **Backend:** Next.js Route Handlers, drizzle-orm 0.44 + pg 8 (PostgreSQL), jose 6 (JWT), bcryptjs 3, zod 4, nodemailer 8, stripe 20, playwright 1.58
 - **AI:** Vercel AI SDK 4 (`ai`, `@ai-sdk/openai`, `@ai-sdk/react`) — example route at `/api/chat`, example UI at `/chat-example`
 - **TypeScript:** 5.9, strict mode
 
 ## Commands
 
 ```bash
-pnpm dev          # dev server on :8497 (Vite + tsx watch)
-pnpm build        # Vite client build + esbuild server bundle
+pnpm dev          # Next.js dev server on :8497 (HMR)
+pnpm build        # Next.js production build → .next/
+pnpm start        # serve the production build
 pnpm check        # tsc --noEmit
 pnpm db:generate  # generate a migration from schema.ts changes
 pnpm db:migrate   # apply pending migrations (use this, not db:push)
@@ -62,7 +63,7 @@ The app lifecycle is managed via the Control App functions (`create_app`, `start
    - `App starting (dev|prod) on port XXXX` — server is launching.
    - If any step is missing or you see `ERROR`, `FATAL`, or `could not start`, the bootstrap failed at that point. Fix the cause before continuing.
 2. **Check the health endpoint** — `curl http://localhost:PORT/api/health` → `{"status":"ok"}`. If this fails, the server didn't start — read `<pkg-name>_logs/error.log`.
-3. **Open the app in the browser** — verify the page loads and you can log in. If you see a blank page or a MIME-type error ("expected JavaScript, got text/html"), the build is missing or stale.
+3. **Open the app in the browser** — verify the page loads and you can log in. If you see a blank page or a 404, the Next.js build is missing or stale (`pnpm build` and check for errors).
 4. **If something fails, read the logs before making code changes.** The fix is usually visible in the error output. Do not guess.
 
 ### Debugging Workflow
@@ -93,11 +94,11 @@ When the app fails or misbehaves after starting:
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| Blank page or "expected JavaScript module, got text/html" | `dist/public/` missing or stale — the catch-all returns `index.html` for every URL. | Run `pnpm build`, check for errors. |
+| Blank page or 404 on all routes | `.next/` missing or stale — Next.js production build not run. | Run `pnpm build`, check for errors. |
 | `Port XXXX is busy` in logs | Another process holds the port. | Server auto-finds the next free port. Check log output for the actual port. |
 | Database connection refused | PostgreSQL not running. | `bash setup-postgres.sh` (local) or `bash start.sh` (runner). Check `pg-data/pg.log`. |
 | API returns 401 on every request | `JWT_SECRET` not set. | Add `JWT_SECRET` to `.env`. Generate with `openssl rand -hex 32`. |
-| `Cannot find module 'dist/index.js'` | Production build never ran. | `pnpm build` first, then `pnpm start`. |
+| `next: command not found` | Dependencies not installed. | `pnpm install` first. |
 
 ## Database Migrations
 
@@ -140,19 +141,27 @@ git add drizzle/migrations/
 ## Directory Map
 
 ```
-client/src/
-  pages/          one file per App.tsx route
-  components/     reusable + components/ui/ (shadcn — don't hand-edit)
+app/
+  layout.tsx      root HTML shell (server component — metadata, fonts, favicon)
+  providers.tsx   "use client" — QueryClient, ThemeProvider, i18n init
+  */page.tsx      thin page wrappers that re-export from src/views/
+  not-found.tsx   404 page
+  api/*/route.ts  Next.js Route Handlers (replaces server/routes/)
+src/
+  views/          business-logic page components ("use client")
+  components/     reusable UI components
+  components/ui/  shadcn primitives — don't hand-edit, regenerate via shadcn CLI
   lib/api.ts      typed fetch wrapper — only way to hit the server
+  lib/basePath.ts BASE_PATH constant + getApiBase()
+  server/
+    getUser.ts    auth helpers for Route Handlers (requireUser, requireAdmin)
   _core/hooks/    useAuth and other cross-cutting hooks
   locales/        de/common.json, en/common.json
 server/
-  _core/          entry point, env, cookies, vite dev middleware
-  middleware/     auth.ts: authenticateUser, requireAuth, requireAdmin
-  routes/         Express routers per resource (auth, tenant, payment, export)
+  _core/          env, auth (JWT sign/verify), cookies
   utils/          logger.ts (pino) — use this, not console
   db.ts           ALL drizzle queries go here
-  email.ts, stripe.ts, pdfExport.ts, webhookRoutes.ts
+  email.ts, stripe.ts, pdfExport.ts, storage.ts
 drizzle/
   schema.ts       tenants, users, invitations, transactions
   migrations/     versioned .sql files (committed) + meta/ journal
@@ -160,35 +169,45 @@ drizzle/
 shared/
   config.ts       APP_NAME, APP_DESCRIPTION, SUPPORT_EMAIL
   const.ts        COOKIE_NAME, ONE_YEAR_MS
+public/           static assets (favicon.svg, etc.)
 ```
 
 ## Request Lifecycle
 
 ```
-Browser ─fetch→ Vite dev proxy / Express (prod static) ─→ authenticateUser middleware (reads JWT cookie, sets req.user)
- ─→ router (zod.parse body) ─→ requireAuth / requireAdmin if needed ─→ handler
+Browser ─fetch→ Next.js Route Handler (app/api/*/route.ts)
+ ─→ try { requireUser(request) }   reads app_session_id cookie → verifies JWT → throws Response(401) if missing
+ ─→ zod.parse(body | params)
  ─→ server/db.ts helper ─→ drizzle-orm ─→ pg pool ─→ PostgreSQL
- ← JSON { data } or { error }
+ ← NextResponse.json({ data }) or NextResponse.json({ error }, { status: 4xx })
 ```
 
 ## Auth Tiers
 
-Three levels, applied as Express middleware from `server/middleware/auth.ts`:
+Three levels, enforced per-handler via helpers from `src/server/getUser.ts`:
 
-| Tier | Middleware | Examples |
+| Tier | Helper | Examples |
 |---|---|---|
-| Public | none | `POST /api/auth/login`, `POST /api/auth/register` |
-| Protected | `requireAuth` | `GET /api/auth/me`, `POST /api/payment/checkout` |
-| Admin | `requireAuth` + `requireAdmin` | `POST /api/tenant/invite`, `DELETE /api/tenant` |
+| Public | (none) | `POST /api/auth/login`, `POST /api/auth/register`, `GET /api/health` |
+| Protected | `requireUser(request)` | `GET /api/auth/me`, `POST /api/payment/checkout` |
+| Admin | `requireAdmin(request)` | `POST /api/tenant/invite`, `DELETE /api/tenant` |
 
-Apply at the router level when every handler needs the same tier:
+Both helpers throw a `Response` object on failure. Wrap the handler body:
 
 ```ts
-router.use(requireAuth);
-router.put("/users/:id/role", requireAdmin, handler);
+export async function GET(request: Request) {
+  try {
+    const user = await requireUser(request);   // throws Response(401) if unauthenticated
+    // const user = await requireAdmin(request); // throws Response(403) if not admin
+    // ... handler logic ...
+    return NextResponse.json({ ... });
+  } catch (err) {
+    if (err instanceof Response) return err;
+    logger.error({ err }, "[Resource] handler error");
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
+}
 ```
-
-Never check roles inside a handler when middleware can enforce it.
 
 ## Feature Recipe
 
@@ -196,11 +215,11 @@ To add a new feature end-to-end:
 
 1. **Schema (if needed)** — edit `drizzle/schema.ts`, run `pnpm db:generate` to create a migration, review the SQL, then `pnpm db:migrate` to apply it. Commit the migration file.
 2. **DB helpers** — add async functions to `server/db.ts` using drizzle-orm. Use `.returning()` for writes, destructure `[row]` for single-row reads.
-3. **API route** — create `server/routes/<resource>.ts` exporting an Express `Router`. Validate body with zod. Register in `server/routes/index.ts`.
-4. **API client method** — add a typed entry to `client/src/lib/api.ts`. Add its query key to `queryKeys` if used with react-query.
-5. **Page or component** — create in `client/src/pages/` or `client/src/components/`. Fetch via `useQuery({ queryFn: api.<method> })`. Wire it into `client/src/App.tsx` if it's a page.
-6. **Sidebar entry (if it's a page users navigate to)** — add an item to `menuGroups` in `client/src/components/DashboardLayout.tsx`: `{ icon, label: "<i18n_key>", path: "/your-page", roles?: ["admin"] }`. Skip this step if the page is intentionally opt-in by URL only.
-7. **i18n** — add every user-facing string as a key in `client/src/locales/de/common.json` AND `en/common.json`. Use `const { t } = useTranslation(); t("key")`. The sidebar `label` is an i18n key, not a literal string.
+3. **API route** — create `app/api/<resource>/route.ts` exporting `GET`/`POST`/`PUT`/`DELETE` functions. Call `requireUser` or `requireAdmin` from `src/server/getUser.ts`. Validate body with zod. Return `NextResponse.json(...)`.
+4. **API client method** — add a typed entry to `src/lib/api.ts`. Add its query key to `queryKeys` if used with react-query.
+5. **Page or component** — create a `"use client"` component in `src/views/` or `src/components/`. Fetch via `useQuery({ queryFn: api.<method> })`. If it's a page, also create `app/<route>/page.tsx` that re-exports it: `export { default } from "@/views/MyPage"`.
+6. **Sidebar entry (if it's a page users navigate to)** — add an item to `menuGroups` in `src/components/DashboardLayout.tsx`: `{ icon, label: "<i18n_key>", path: "/your-page", roles?: ["admin"] }`. Skip this step if the page is intentionally opt-in by URL only.
+7. **i18n** — add every user-facing string as a key in `src/locales/de/common.json` AND `en/common.json`. Use `const { t } = useTranslation(); t("key")`. The sidebar `label` is an i18n key, not a literal string.
 8. **Verify** — `pnpm check` (types), `pnpm lint`, manual test at `http://localhost:8497`.
 
 ## Quick Patterns
@@ -236,29 +255,35 @@ const mutation = useMutation({
 });
 ```
 
-Express route with validation:
+Next.js Route Handler with validation:
 ```ts
+// app/api/auth/login/route.ts
 const schema = z.object({ email: z.string().email(), password: z.string().min(6) });
-router.post("/login", async (req, res) => {
-  const body = schema.parse(req.body);
-  // ...
-});
+export async function POST(request: Request) {
+  try {
+    const body = schema.parse(await request.json());
+    // ...
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    if (err instanceof Response) return err;
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
+}
 ```
 
 ## Deployment (sub-path / Halerium)
 
-The template is deployable behind a reverse-proxy sub-path (e.g. Halerium mounts apps at `/apps/<org>/<ws>/<AppName>/`). Three layers are already wired — do not duplicate this logic:
+The template is deployable behind a reverse-proxy sub-path (e.g. Halerium mounts apps at `/apps/<org>/<ws>/<AppName>/`). Two layers are already wired — do not duplicate this logic:
 
-- **Assets** — `vite.config.ts` has `base: "./"` (relative URLs resolved against `document.baseURI`).
-- **Client routing** — `client/src/App.tsx` wraps routes in `<Router base={BASE_PATH}>`.
-- **API client** — `client/src/lib/api.ts` prepends `BASE_PATH` to `/api/*` calls.
+- **Next.js assets + routing** — `next.config.ts` sets `basePath: process.env.NEXT_PUBLIC_BASE_PATH ?? ""`. All `<Link>` hrefs, `router.push()`, and asset URLs automatically prepend the base path.
+- **API client** — `src/lib/api.ts` prepends `BASE_PATH` via `getApiBase()` from `src/lib/basePath.ts`.
 
-`BASE_PATH` is resolved in `client/src/lib/basePath.ts`: `VITE_BASE_PATH` env → `<base href>` tag → `""`. The server (`server/_core/vite.ts`) injects the `<base href="${prefix}/">` tag at request time, reading `X-Forwarded-Prefix` or the `BASE_PATH` env var.
+`NEXT_PUBLIC_BASE_PATH` is a **build-time** constant. `start.sh` exports it before `pnpm build` when `HALERIUM_ID` is set. If the runner is recycled with a new `HALERIUM_ID`, delete `.next/` to force a rebuild.
 
 **Runner bootstrap:** `start.sh` (at repo root) idempotently upgrades Node to v20, installs pnpm + Postgres, handles stale `postmaster.pid` after ephemeral spin-downs, pushes schema, seeds, and launches via package.json scripts only:
 
-- `bash start.sh [PORT]` — prod: builds if needed, runs `pnpm start`.
-- `bash start.sh --dev [PORT]` — dev: runs `pnpm dev` (Vite + tsx watch, HMR). Use this while iterating.
+- `bash start.sh [PORT]` — prod: builds if needed (`if [ ! -f .next/BUILD_ID ]`), runs `pnpm start`.
+- `bash start.sh --dev [PORT]` — dev: runs `pnpm dev` (Next.js HMR). Use this while iterating.
 
 Use runner type **`nano`** on Halerium (`standard` silently fails).
 
@@ -278,29 +303,30 @@ OPENAI_MODEL=gpt-4o-mini
 
 `OPENAI_BASE_URL` lets you swap in Azure OpenAI, OpenRouter, vLLM, or a local Ollama (via its OpenAI-compat shim) without code changes.
 
-**Server — `server/routes/chat.ts`** — `requireAuth` router, zod-validates `{ messages }`, pipes `streamText(...).pipeDataStreamToResponse(res)`. Swap providers by installing `@ai-sdk/anthropic` (or similar) and replacing `openai(model)` with `anthropic(model)`.
+**Server — `app/api/chat/route.ts`** — calls `requireUser`, zod-validates `{ messages }`, returns `streamText(...).toDataStreamResponse()`. Swap providers by installing `@ai-sdk/anthropic` (or similar) and replacing `openai(model)` with `anthropic(model)`.
 
-**Client — `client/src/components/chat/ChatExample.tsx`** — uses `useChat` from `@ai-sdk/react` with `api: \`${getApiBase()}/chat\`` and `credentials: "include"`. The `getApiBase()` call is required — hard-coding `/api/chat` breaks sub-path deployments.
+**Client — `src/components/chat/ChatExample.tsx`** — uses `useChat` from `@ai-sdk/react` with `api: \`${getApiBase()}/chat\`` and `credentials: "include"`. The `getApiBase()` call is required — hard-coding `/api/chat` breaks sub-path deployments.
 
-**To add a new AI feature**: copy `chat.ts`, adjust the system prompt / messages shape, register it in `server/routes/index.ts`, and build a UI using `useChat` (chat) or `useCompletion` (single-turn) pointed at the new endpoint.
+**To add a new AI feature**: copy `app/api/chat/route.ts`, adjust the system prompt / messages shape, create a `src/views/` page that uses `useChat` (chat) or `useCompletion` (single-turn) pointed at the new endpoint.
 
 ## Anti-Patterns
 
 Never:
 
-- Deploy without building first. `pnpm start` serves from `dist/` — run `pnpm build` and check its output for errors before starting. On runners, use `start.sh` (it builds automatically).
+- Deploy without building first. `pnpm start` serves from `.next/` — run `pnpm build` and check its output for errors before starting. On runners, use `start.sh` (it builds automatically).
 - Claim the app is working without verifying. After starting, check `curl localhost:PORT/api/health` → `{"status":"ok"}` and open the app in a browser. If something fails, read the logs (see **Log Files** above) before making more changes.
 - Run `db:push` against a production database or any database with real data. Use `pnpm db:generate` + `pnpm db:migrate` instead. See **Database Migrations** above.
 - Skip committing migration files. The `.sql` files in `drizzle/migrations/` are version-controlled — they are the authoritative record of every schema change.
 - Run raw SQL (`CREATE TABLE`, `ALTER TABLE`, `DROP`) to change the schema. All changes go through `drizzle/schema.ts` → `pnpm db:generate`.
-- Reintroduce tRPC. The API is Express REST by design.
+- Reintroduce tRPC or Express. The API uses Next.js Route Handlers by design.
 - Add `axios`. Use the `fetch`-based `api.*` wrapper.
-- Call `fetch` directly from a component. Go through `client/src/lib/api.ts`.
+- Call `fetch` directly from a component. Go through `src/lib/api.ts`.
 - Scatter drizzle queries across route handlers. Put them in `server/db.ts`.
 - Hardcode `APP_NAME`, support email, or copy strings. Use `shared/config.ts` and i18n keys.
-- Assume the app is served from `/`. Use `BASE_PATH` / `getApiBase()` from `client/src/lib/basePath.ts` for client-side URL construction.
+- Assume the app is served from `/`. Use `BASE_PATH` / `getApiBase()` from `src/lib/basePath.ts` for client-side URL construction.
 - Use `console.log/error/warn` in server code. Import `logger` from `server/utils/logger.ts` and use `logger.info/warn/error/debug`. Pass errors as `logger.error({ err }, "message")`. Logs land in `<pkg-name>_logs/app.log` (all levels) and `error.log` (errors). Dev defaults to `debug`, prod to `info`; override with `LOG_LEVEL`.
-- Commit `.env`, `pg-data/`, `uploads/`, `data/`, `dist/`, `*_logs/`.
+- Access `localStorage` or `window` in component top-level state initializers — Next.js SSRs `"use client"` components for the initial HTML. Guard with `if (typeof window === "undefined")`.
+- Commit `.env`, `pg-data/`, `uploads/`, `data/`, `.next/`, `*_logs/`.
 - Skip git hooks with `--no-verify`.
 - Use `any`, `console.log` in committed code, or browser `alert`.
 
@@ -312,6 +338,7 @@ Full list in `CONVENTIONS.md`.
 - **[`ARCHITECTURE.md`](./ARCHITECTURE.md)** — system overview with ASCII diagrams.
 - **[`DEPLOYMENT.md`](./DEPLOYMENT.md)** — Halerium runner, proxy sub-path config, ephemeral DB bootstrap.
 - **[`README.md`](./README.md)** — human-oriented quick start and customization.
+- **[`next.config.ts`](./next.config.ts)** — basePath, serverExternalPackages.
 - **[`docs/architecture-logical.md`](./docs/architecture-logical.md)** — runtime view and sequence diagrams (mermaid).
 - **[`docs/architecture-development.md`](./docs/architecture-development.md)** — build pipeline and code organization.
 - **[`docs/architecture-data.md`](./docs/architecture-data.md)** — schema, data flow, state.

@@ -1,11 +1,11 @@
-import type { CookieOptions, Request } from "express";
-import { logger } from "../utils/logger";
+export type SessionCookieOptions = {
+  httpOnly: boolean;
+  path: string;
+  sameSite: "lax" | "strict" | "none";
+  secure: boolean;
+};
 
-export function getSessionCookieOptions(
-  _req: Request
-): Pick<CookieOptions, "domain" | "httpOnly" | "path" | "sameSite" | "secure"> {
-  // DEBUG: Force secure=false and SameSite=Lax to ensure browser accepts cookie
-  logger.debug("[Cookies] Generating cookie options. Secure forced to FALSE.");
+export function getSessionCookieOptions(): SessionCookieOptions {
   return {
     httpOnly: true,
     path: "/",

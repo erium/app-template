@@ -1,7 +1,5 @@
 import { SignJWT, jwtVerify } from "jose";
-import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
-import type { Request } from "express";
-import { parse as parseCookieHeader } from "cookie";
+import { ONE_YEAR_MS } from "@shared/const";
 import * as db from "../db";
 import { logger } from "../utils/logger";
 import { ENV } from "./env";
@@ -61,46 +59,6 @@ class LocalAuthService {
     }
   }
 
-  private parseCookies(cookieHeader: string | undefined) {
-    if (!cookieHeader) {
-      return new Map<string, string>();
-    }
-    const parsed = parseCookieHeader(cookieHeader);
-    return new Map(Object.entries(parsed));
-  }
-
-  async authenticateRequest(req: Request) {
-    const cookies = this.parseCookies(req.headers.cookie);
-    const sessionCookie = cookies.get(COOKIE_NAME);
-
-    if (!sessionCookie) {
-        return null;
-    }
-
-    const session = await this.verifySession(sessionCookie);
-
-    if (!session) {
-      return null;
-    }
-
-    // We fetch the user to ensure they still exist and have access
-    const user = await db.getUserById(session.userId);
-    if (!user) {
-      logger.warn({ userId: session.userId }, "[Auth] User from valid token not found in DB");
-      return null;
-    }
-
-    // Security check: Ensure token tenant matches user tenant
-    if (user.tenantId !== session.tenantId) {
-        logger.warn({ userId: user.id, tokenTenantId: session.tenantId, dbTenantId: user.tenantId }, "[Auth] Tenant mismatch");
-        return null;
-    }
-
-    // Update last signed in (async, don't await to block)
-    db.updateUserLastSignedIn(user.id).catch((err) => logger.error({ err }, "Failed to update last login"));
-
-    return user;
-  }
 }
 
 export const authService = new LocalAuthService();

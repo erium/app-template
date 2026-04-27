@@ -137,12 +137,12 @@ pnpm db:seed >> "$LOG" 2>&1 || true
 # 8. Run — always via package.json scripts
 export PORT="${1:-8497}"
 
-# Auto-detect Halerium runner sub-path so the server injects the correct <base href>.
-# HALERIUM_ID is set by the platform (matches the runner ID in the proxy URL).
-# Skip if BASE_PATH was already set explicitly (e.g. local sub-path testing).
-if [ -n "$HALERIUM_ID" ] && [ -z "$BASE_PATH" ]; then
-  export BASE_PATH="/apps/${HALERIUM_ID}/${PORT}"
-  log "Halerium runner detected — BASE_PATH=$BASE_PATH"
+# Auto-detect Halerium runner sub-path and bake it into the Next.js build.
+# NEXT_PUBLIC_BASE_PATH must be set BEFORE `next build` because it is baked
+# into the JS bundles at build time.
+if [ -n "$HALERIUM_ID" ] && [ -z "$NEXT_PUBLIC_BASE_PATH" ]; then
+  export NEXT_PUBLIC_BASE_PATH="/apps/${HALERIUM_ID}/${PORT}"
+  log "Halerium runner detected — NEXT_PUBLIC_BASE_PATH=$NEXT_PUBLIC_BASE_PATH"
 fi
 
 if [ "$MODE" = "dev" ]; then
@@ -150,7 +150,7 @@ if [ "$MODE" = "dev" ]; then
   exec pnpm dev
 fi
 
-if [ ! -f dist/index.js ] || [ ! -d dist/public ]; then
+if [ ! -f .next/BUILD_ID ]; then
   log "Building..."
   NODE_OPTIONS="--max-old-space-size=768" pnpm build >> "$LOG" 2>&1
 fi

@@ -8,11 +8,11 @@ export default tseslint.config(
   {
     ignores: [
       "dist/",
-      "build/",
+      ".next/",
       "data/",
       "node_modules/",
       "drizzle/migrations/",
-      "client/src/components/ui/",
+      "src/components/ui/",
     ],
   },
   js.configs.recommended,
@@ -30,7 +30,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ["client/**/*.{ts,tsx}"],
+    files: ["src/**/*.{ts,tsx}", "app/**/*.{ts,tsx}"],
     plugins: {
       "react-hooks": reactHooks,
       "react-refresh": reactRefresh,

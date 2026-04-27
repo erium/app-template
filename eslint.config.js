@@ -31,7 +31,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ["src/**/*.{ts,tsx}", "app/**/*.{ts,tsx}"],
+    files: ["src/**/*.{ts,tsx}"],
     plugins: {
       "react-hooks": reactHooks,
       "react-refresh": reactRefresh,
@@ -46,6 +46,12 @@ export default tseslint.config(
       "react-hooks/immutability": "warn",
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
     },
+  },
+  {
+    files: ["app/**/*.{ts,tsx}"],
+    plugins: { "react-hooks": reactHooks },
+    languageOptions: { globals: globals.browser },
+    rules: { ...reactHooks.configs.recommended.rules },
   },
   {
     files: ["server/**/*.ts"],

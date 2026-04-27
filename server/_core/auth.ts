@@ -1,6 +1,5 @@
 import { SignJWT, jwtVerify } from "jose";
 import { ONE_YEAR_MS } from "@shared/const";
-import * as db from "../db";
 import { logger } from "../utils/logger";
 import { ENV } from "./env";
 

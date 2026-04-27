@@ -13,8 +13,8 @@ graph TB
     User["👤 User<br/>(Browser)"]
 
     subgraph System["Application"]
-        SPA["React SPA<br/>(Client)"]
-        API["Express API<br/>(Server)"]
+        SPA["Next.js App<br/>(Client + Server)"]
+        API["Route Handlers<br/>(app/api/*)"]
         DB[("PostgreSQL<br/>Database")]
         FS["Local<br/>File Storage"]
     end
@@ -42,16 +42,16 @@ The major logical components and their responsibilities.
 
 ```mermaid
 graph LR
-    subgraph Client["Client (React SPA)"]
-        Pages["Pages<br/>12 routes"]
+    subgraph Client["Client (Next.js App Router)"]
+        Pages["Views<br/>src/views/ — 13 routes"]
         Components["Components<br/>UI + Domain"]
         Hooks["Hooks<br/>useAuth, useMobile"]
         APIClient["API Client<br/>Typed fetch + React Query"]
     end
 
-    subgraph Server["Server (Express)"]
-        Middleware["Middleware<br/>Auth, Body Parser"]
-        Routes["Route Modules<br/>auth, tenant, payment, export"]
+    subgraph Server["Server (Next.js Route Handlers)"]
+        Middleware["Auth Helpers<br/>requireUser, requireAdmin"]
+        Routes["Route Handlers<br/>app/api/ auth, tenant, payment, export"]
         Services["Services<br/>Email, Stripe, Storage, PDF"]
         DBLayer["DB Layer<br/>Drizzle queries"]
     end
@@ -81,8 +81,8 @@ How a user registers, logs in, and makes authenticated requests.
 ```mermaid
 sequenceDiagram
     actor User
-    participant Client as React SPA
-    participant API as Express API
+    participant Client as Next.js App
+    participant API as Route Handlers
     participant DB as PostgreSQL
     participant Email as SMTP
 
@@ -108,8 +108,7 @@ sequenceDiagram
 
     Note over User,Email: Authenticated Request
     Client->>API: GET /api/tenant/settings<br/>(cookie: app_session_id)
-    API->>API: authenticateUser middleware<br/>JWT verify → populate req.user
-    API->>API: requireAuth middleware
+    API->>API: requireUser(request)<br/>parse cookie → JWT verify → fetch user
     API->>DB: getTenantById()
     API-->>Client: { name: "..." }
 ```
@@ -123,8 +122,8 @@ How credits are purchased via Stripe Checkout.
 ```mermaid
 sequenceDiagram
     actor User
-    participant Client as React SPA
-    participant API as Express API
+    participant Client as Next.js App
+    participant API as Route Handlers
     participant Stripe as Stripe
     participant DB as PostgreSQL
 
@@ -165,8 +164,8 @@ graph TD
 
     subgraph Permissions["Endpoint Authorization"]
         Public["Public<br/>/api/auth/login<br/>/api/auth/register<br/>/api/health"]
-        AuthRequired["requireAuth<br/>/api/payment/*<br/>/api/export/*<br/>/api/auth/language"]
-        AdminOnly["requireAdmin<br/>/api/tenant/users<br/>/api/tenant/invite<br/>/api/tenant/name"]
+        AuthRequired["requireUser(request)<br/>/api/payment/*<br/>/api/export/*<br/>/api/auth/language"]
+        AdminOnly["requireAdmin(request)<br/>/api/tenant/users<br/>/api/tenant/invite<br/>/api/tenant/name"]
     end
 
     Admin -->|"Access"| Public
@@ -191,8 +190,8 @@ How users are invited to join a tenant.
 ```mermaid
 sequenceDiagram
     actor Admin
-    participant Client as React SPA
-    participant API as Express API
+    participant Client as Next.js App
+    participant API as Route Handlers
     participant DB as PostgreSQL
     participant Email as SMTP
     actor Invitee

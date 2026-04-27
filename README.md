@@ -1,6 +1,6 @@
 # My App — Full-Stack Template
 
-A production-ready full-stack TypeScript template: React + Express + PostgreSQL with auth, multi-tenancy, i18n, Stripe billing, and PDF export wired up.
+A production-ready full-stack TypeScript template: React + Next.js + PostgreSQL with auth, multi-tenancy, i18n, Stripe billing, and PDF export wired up.
 
 Clone it, rename it, build your app on top.
 
@@ -14,7 +14,7 @@ Clone it, rename it, build your app on top.
 - **AI chat** — Vercel AI SDK streaming example at `/chat-example`, OpenAI-compatible (swap `OPENAI_BASE_URL` for Azure / OpenRouter / local).
 - **Email** — Nodemailer with SMTP (logs to console if unconfigured).
 - **UI** — shadcn/ui (53 components) on TailwindCSS 4, Radix primitives, dark-mode ready.
-- **Type-safe API** — Express REST with zod validation and a typed `fetch` wrapper on the client.
+- **Type-safe API** — Next.js Route Handlers with zod validation and a typed `fetch` wrapper on the client.
 
 ## Prerequisites
 
@@ -58,17 +58,21 @@ Change that password immediately.
 
 ```
 .
-├── client/            React + Vite frontend
-│   └── src/
-│       ├── pages/     One file per route
-│       ├── components/ui/  shadcn primitives
-│       ├── lib/       api.ts (typed fetch), i18n.ts, utils.ts
-│       └── locales/   de/, en/
-├── server/            Express backend
-│   ├── _core/         Entry point, env, cookies, vite dev middleware
-│   ├── middleware/    auth.ts (requireAuth, requireAdmin)
-│   ├── routes/        REST endpoints grouped by resource
+├── app/               Next.js App Router
+│   ├── layout.tsx     Root HTML shell
+│   ├── providers.tsx  Client providers (QueryClient, theme, i18n)
+│   ├── */page.tsx     Page wrappers (re-export from src/views/)
+│   └── api/*/route.ts Route Handlers (REST endpoints)
+├── src/               Client-side code
+│   ├── views/         One file per route (business-logic pages)
+│   ├── components/ui/ shadcn primitives
+│   ├── lib/           api.ts (typed fetch), basePath.ts, i18n.ts, utils.ts
+│   ├── server/        getUser.ts (auth helpers for Route Handlers)
+│   └── locales/       de/, en/
+├── server/            Business logic (db, email, stripe, pdf, auth)
+│   ├── _core/         env.ts, auth.ts (JWT), cookies.ts
 │   └── db.ts          Drizzle queries
+├── public/            Static assets (favicon, etc.)
 ├── drizzle/           Schema, migrations, seed
 ├── shared/            config.ts, const.ts shared by client + server
 ├── docs/              Architecture documentation
@@ -81,9 +85,9 @@ Change that password immediately.
 
 | Script | What it does |
 |---|---|
-| `pnpm dev` | Dev server with Vite + `tsx watch`. |
-| `pnpm build` | Vite client build + esbuild server bundle into `dist/`. |
-| `pnpm start` | Run the production bundle. |
+| `pnpm dev` | Next.js dev server with HMR. |
+| `pnpm build` | Next.js production build → `.next/`. |
+| `pnpm start` | Serve the production build. |
 | `pnpm check` | TypeScript check (`tsc --noEmit`). |
 | `pnpm lint` / `pnpm lint:fix` | ESLint. |
 | `pnpm format` | Prettier write. |
@@ -128,14 +132,14 @@ export const APP_DESCRIPTION = "A full-stack application template";
 export const SUPPORT_EMAIL = "support@example.com";
 ```
 
-Replace [`client/public/favicon.svg`](./client/public/favicon.svg) with your own icon. That's it for branding — `APP_NAME` flows through UI, page titles, and email templates.
+Replace [`public/favicon.svg`](./public/favicon.svg) with your own icon. That's it for branding — `APP_NAME` flows through UI, page titles, and email templates.
 
 ### Adding Features
 
-- **New page** — add a file to `client/src/pages/`, wire it into `client/src/App.tsx`.
-- **New API route** — add a file to `server/routes/`, register it in `server/routes/index.ts`.
+- **New page** — add a `"use client"` file to `src/views/`, create `app/<route>/page.tsx` that re-exports it.
+- **New API route** — create `app/api/<resource>/route.ts` exporting `GET`/`POST`/etc. functions.
 - **New DB table** — edit `drizzle/schema.ts`, run `pnpm db:generate` + `pnpm db:migrate`, add helpers to `server/db.ts`.
-- **New i18n string** — add the key to both `client/src/locales/de/common.json` and `en/common.json`.
+- **New i18n string** — add the key to both `src/locales/de/common.json` and `en/common.json`.
 
 See the "Feature Recipe" section of `llm.txt` for the full step-by-step.
 

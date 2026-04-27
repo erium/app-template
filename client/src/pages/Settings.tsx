@@ -14,6 +14,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
+import { getLoginUrl } from "@/const";
 
 export default function Settings() {
   const { t } = useTranslation();
@@ -57,7 +58,7 @@ export default function Settings() {
     onSuccess: () => {
       toast.success(t("org_deleted", { defaultValue: "Organisation gelöscht" }));
       queryClient.setQueryData(queryKeys.me, null);
-      window.location.href = "/login";
+      window.location.href = getLoginUrl();
     },
     onError: (err) => {
       toast.error(err.message);
@@ -69,7 +70,7 @@ export default function Settings() {
     onSuccess: () => {
       toast.success(t("account_deleted", { defaultValue: "Konto erfolgreich gelöscht" }));
       queryClient.setQueryData(queryKeys.me, null);
-      window.location.href = "/login";
+      window.location.href = getLoginUrl();
     },
     onError: (err) => {
       toast.error(err.message);

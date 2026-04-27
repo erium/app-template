@@ -33,7 +33,8 @@ import {
   Coins, Home, LogOut, MessageSquare, Settings as SettingsIcon, PanelLeft, Users
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
-import { useLocation } from "wouter";
+import { Link, useLocation } from "wouter";
+import { getLoginUrl } from "@/const";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 
 type MenuItem = {
@@ -95,7 +96,7 @@ export default function DashboardLayout({
 
   useEffect(() => {
     if (!loading && !user && typeof window !== "undefined") {
-      window.location.href = "/login";
+      window.location.href = getLoginUrl();
     }
   }, [loading, user]);
 
@@ -173,7 +174,7 @@ function DashboardLayoutContent({
 
   const handleLogout = async () => {
     await logout();
-    window.location.href = "/login";
+    window.location.href = getLoginUrl();
   };
 
   const roleLabel = 
@@ -234,13 +235,15 @@ function DashboardLayoutContent({
                           return (
                             <SidebarMenuItem key={item.path}>
                               <SidebarMenuButton
+                                asChild
                                 isActive={isActive}
-                                onClick={() => setLocation(item.path)}
                                 tooltip={t(item.label)}
                                 className="h-10 transition-all font-normal"
                               >
-                                <item.icon className={`h-4 w-4 ${isActive ? "text-sidebar-primary-foreground" : "text-sidebar-foreground/70"}`} />
-                                <span>{t(item.label)}</span>
+                                <Link href={item.path}>
+                                  <item.icon className={`h-4 w-4 ${isActive ? "text-sidebar-primary-foreground" : "text-sidebar-foreground/70"}`} />
+                                  <span>{t(item.label)}</span>
+                                </Link>
                               </SidebarMenuButton>
                             </SidebarMenuItem>
                           );

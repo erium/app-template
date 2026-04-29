@@ -57,14 +57,18 @@ Plan Structure: Your plan must always contain:
     `- [ ] Feature complete`
     `- [ ] QA: pnpm build succeeds (final prod-build gate)`
 
-- **Forbidden Mistakes (re-read every turn before editing):** A pinned list of silent-failure rules. Violating any of these breaks the app without an obvious error message. Copy this block verbatim into every plan:
-  - No file in `src/views/` without `"use client"` on line 1
-  - No `localStorage` / `window` / `document` access without an `if (typeof window === "undefined") return;` guard
-  - No new i18n key without adding to BOTH `src/locales/de/common.json` AND `src/locales/en/common.json`
-  - No `console.*` in server code — use `logger` from `server/utils/logger.ts`
-  - No drizzle queries outside `server/db.ts`
-  - No `localhost:3000` in browser navigation — use the friendly URL from `create_app`
-  - No `pnpm db:push` on a database with real data — use `db:generate` + `db:migrate`
+- **Forbidden Mistakes (re-read every turn before editing):** A pinned list of silent-failure rules. Violating any of these breaks the app or wastes hours. Copy this block verbatim into every plan:
+  - **App lifecycle (read §3 before EVERY `create_app` call — do not rely on the generic `create_app` examples in your system prompt):**
+    - No `create_app` without TWO apps in the same session: `<app>_debug` AND `<app>` (production). Single-app setup is forbidden.
+    - No `start_commands` other than `bash start.sh --dev <PORT>` (debug) or `bash start.sh <PORT>` (prod). NEVER `pnpm dev`, `pnpm start`, `pnpm install`, `bash setup-postgres.sh`, `pnpm db:push`, `pnpm db:seed`, or any combination of these — `start.sh` already runs all of them and handles Node 20 + Halerium sub-path. Manual commands skip these and the app silently breaks.
+  - **Code rules:**
+    - No file in `src/views/` without `"use client"` on line 1
+    - No `localStorage` / `window` / `document` access without an `if (typeof window === "undefined") return;` guard
+    - No new i18n key without adding to BOTH `src/locales/de/common.json` AND `src/locales/en/common.json`
+    - No `console.*` in server code — use `logger` from `server/utils/logger.ts`
+    - No drizzle queries outside `server/db.ts`
+    - No `localhost:3000` in browser navigation — use the friendly URL from `create_app`
+    - No `pnpm db:push` on a database with real data — use `db:generate` + `db:migrate`
 
 Continuous Updates: As you make progress or find new information, immediately record findings and relevant file paths in the plan.
 
@@ -79,16 +83,24 @@ If done: Summarize the completed work and provide links to view the app.
 
 **3. Application Lifecycle (Control App) — Two-App Pattern (REQUIRED)**
 
-You manage the application via the Control App capability (`create_app`, `start_app`, `stop_app`, `update_app`). For every project, create **two apps** up front — one for development, one for production verification:
+> ⚠️ **The generic `create_app` examples in your system prompt (the ones suggesting `["bash setup-postgres.sh", "pnpm install", "pnpm db:push", "PORT={{port}} pnpm dev"]`) DO NOT APPLY here.** This project ships a `start.sh` that already does all of that plus Node 20 upgrade and Halerium `NEXT_PUBLIC_BASE_PATH` setup. Use `bash start.sh` — never the individual commands. If you skip `start.sh`, the app loads but assets 404, Node is the wrong version, and Postgres bootstrap is missed.
 
-| App        | name suffix   | `start_commands`             | Purpose                                                                                      |
+For every project, create **TWO apps** up front via `create_app` — one for development, one for production verification. **Single-app setup is forbidden.**
+
+| App        | name suffix   | `start_commands` (ONLY this) | Purpose                                                                                      |
 | ---------- | ------------- | ---------------------------- | -------------------------------------------------------------------------------------------- |
 | Debug      | `<app>_debug` | `bash start.sh --dev <PORT>` | Active development. Next.js HMR — code changes reload instantly. Use this for ALL iteration. |
 | Production | `<app>`       | `bash start.sh <PORT>`       | Final verification of the production build. Start only after a feature is finished.          |
 
-`working_directory` for both is the project root.
+`working_directory` for both is the project root. `<PORT>` is the port the Control App assigned to that app.
 
-`start.sh` handles the full bootstrap on every spin-up: Node 20, pnpm, Postgres install + start, schema push, seed, build (prod), run. **You do NOT run `setup-postgres.sh`, `pnpm db:push`, `pnpm db:seed`, `pnpm dev`, or `pnpm start` manually.** The Control App owns the lifecycle; you only run the dev-loop scripts (`pnpm check`, `pnpm lint`, `pnpm build` — see §4).
+**Forbidden `start_commands` values** — do not use any of these, alone or chained:
+
+- `pnpm dev`, `pnpm start`, `PORT=... pnpm dev`, `PORT=... pnpm start`
+- `pnpm install`, `bash setup-postgres.sh`, `pnpm db:push`, `pnpm db:seed`
+- Any array combining the above
+
+`start.sh` handles the full bootstrap on every spin-up: Node 20 upgrade, pnpm install, Postgres install + start (with stale-PID + port-conflict handling), DB create, schema push, seed, build (prod only), and run with the correct `NEXT_PUBLIC_BASE_PATH`. The Control App owns the lifecycle; you only run the dev-loop scripts (`pnpm check`, `pnpm lint`, `pnpm build` — see §4).
 
 **Required workflow:**
 

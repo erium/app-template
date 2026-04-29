@@ -16,6 +16,18 @@ After detaching, add your own remote with `git remote add origin <your-repo-url>
 
 A generic full-stack TypeScript template: React frontend + Next.js Route Handlers + PostgreSQL via Drizzle ORM. Ships with auth, multi-tenancy (tenant → users → invitations), i18n (de/en), Stripe billing, PDF export (Playwright), and 53 shadcn/ui components. Single `package.json` (no monorepo). Branding lives in `shared/config.ts`.
 
+## Silent-Failure Gotchas — Memorize These
+
+These rules are silent: violating them breaks the app without an obvious error message. Check this list before writing any new file. **When something fails: read logs first, code last** — the fix is almost always visible in the error output. Do not guess.
+
+- **Every file in `src/views/` MUST start with `"use client"` on line 1.** Without it, hooks like `useState`/`useQuery` throw a server-component error that's hard to trace.
+- **Guard all `localStorage` / `window` / `document` access with `if (typeof window === "undefined") return;`** — Next.js SSRs `"use client"` components for the initial HTML, so top-level access crashes the server render.
+- **i18n keys must exist in BOTH `src/locales/de/common.json` AND `src/locales/en/common.json`.** Missing one falls back silently to the key string — no error, just garbled UI.
+- **All drizzle queries go in `server/db.ts`.** Don't write `db.select()` in a route handler; route handlers call helpers from db.ts.
+- **Server code uses `logger` from `server/utils/logger.ts`, never `console.*`.** Console output bypasses NDJSON log files and is invisible to debugging.
+- **Browser must navigate the friendly URL from `create_app`, never `localhost:3000`.** Halerium serves at a sub-path; localhost loads but assets 404.
+- **Schema changes go through `pnpm db:generate` → review SQL → `pnpm db:migrate`.** Never `db:push` after seeding real data; never run raw `CREATE TABLE` / `ALTER TABLE`.
+
 ## Stack
 
 - **Runtime:** Node 20+, pnpm 10
@@ -27,68 +39,37 @@ A generic full-stack TypeScript template: React frontend + Next.js Route Handler
 ## Commands
 
 ```bash
-pnpm dev          # Next.js dev server on :8497 (HMR)
-pnpm build        # Next.js production build → .next/
-pnpm start        # serve the production build
-pnpm check        # tsc --noEmit
+pnpm check        # tsc --noEmit — run after every edit
+pnpm lint         # eslint .   — run after every edit (use lint:fix for autofixes)
+pnpm build        # next build → .next/ — run once at end of each feature
 pnpm db:generate  # generate a migration from schema.ts changes
 pnpm db:migrate   # apply pending migrations (use this, not db:push)
 pnpm db:push      # destructive schema sync — first-time local setup ONLY
 pnpm db:seed      # idempotent seed: tenant + admin@example.com / ChangeMe!2026
+pnpm dev          # next dev — local-only; agents use start.sh --dev via Control App
+pnpm start        # next start — local-only; agents use start.sh via Control App
 ```
 
 PostgreSQL setup: `bash setup-postgres.sh` (apt-installs locally, not Docker). Uninstall: `bash setup-postgres.sh uninstall`.
 
 ## Build & Run
 
-The app lifecycle is managed via the Control App functions (`create_app`, `start_app`, `stop_app`, `update_app`). When creating or starting the app, set `working_directory` to the project root and `start_commands` to one of:
+The app runs via the Control App capability with a two-app pattern (debug + production) — see **setup.md §3** for the workflow. `start.sh` handles the full bootstrap on every spin-up: Node 20, pnpm, Postgres install + start, schema push, seed, build (prod only), and run. Do not invoke `pnpm dev` / `pnpm start` / `setup-postgres.sh` / `pnpm db:push` / `pnpm db:seed` directly — the Control App owns the lifecycle.
 
-| Mode | `start_commands` | When to use |
-|---|---|---|
-| **Dev** | `bash start.sh --dev PORT` | While developing and debugging. Logs every request at `debug` level. |
-| **Prod** | `bash start.sh PORT` | Final deployment. Builds automatically, logs at `info` level. |
+The dev-loop scripts you DO run yourself are `pnpm check`, `pnpm lint`, and `pnpm build` — see **setup.md §4** for the inner-loop sequence (edit → check → lint → HMR → browser → log → build).
 
-`start.sh` handles the full bootstrap (Node upgrade, pnpm, Postgres, migrations, seed, build) — you don't need to run these steps separately.
-
-**Use dev mode (`--dev`) while iterating.** It gives you richer logs (pino-pretty, debug level) that make errors much easier to find. Only switch to prod mode for the final deployment.
-
-### After Starting — Verify (mandatory)
-
-**Do not assume the app works. Verify every time you start it:**
-
-1. **Read `app-startup.log`** (in the project root) — confirm the bootstrap completed. Look for these markers in order:
-   - `PostgreSQL ready.` — database is up.
-   - `migrations applied successfully` — schema is current.
-   - `Seed complete.` — default data exists.
-   - `App starting (dev|prod) on port XXXX` — server is launching.
-   - If any step is missing or you see `ERROR`, `FATAL`, or `could not start`, the bootstrap failed at that point. Fix the cause before continuing.
-2. **Check the health endpoint** — `curl http://localhost:PORT/api/health` → `{"status":"ok"}`. If this fails, the server didn't start — read `<pkg-name>_logs/error.log`.
-3. **Open the app in the browser** — verify the page loads and you can log in. If you see a blank page or a 404, the Next.js build is missing or stale (`pnpm build` and check for errors).
-4. **If something fails, read the logs before making code changes.** The fix is usually visible in the error output. Do not guess.
-
-### Debugging Workflow
-
-When the app fails or misbehaves after starting:
-
-1. **Stop the app** (via `stop_app`).
-2. **Read the logs** — check `app-startup.log`, `<pkg-name>_logs/error.log`, and `pg-data/pg.log` (see Log Files below).
-3. **Ensure you are running in dev mode** (`bash start.sh --dev PORT` in `start_commands`) — dev mode logs every request and error at `debug` level.
-4. **Start the app** (via `start_app`), open it in the browser, trigger the failing action, and read the log output.
-5. **Fix and restart** — make the code change, then stop → start → verify again.
-
-**Never claim the app is fixed without going through this cycle.**
+The friendly URL returned by `create_app` is what the browser navigates to (never `localhost:3000`). Save both URLs in your plan.
 
 ### Log Files
 
-| Log | Path | When to check |
-|---|---|---|
-| Console (dev) | terminal stdout | Always in dev — every request and error appears here. |
-| App log | `<pkg-name>_logs/app.log` | All log levels. Check when debugging prod issues. |
-| Error log | `<pkg-name>_logs/error.log` | Errors only — **check first** when something breaks. |
-| Startup log | `app-startup.log` (repo root) | Bootstrap output from `start.sh` (Node/Postgres/build/seed). Check if the app fails to boot on a runner. |
-| PostgreSQL | `pg-data/pg.log` | Database daemon log. Check if queries fail or connections are refused. |
+Logs live in `logs/` at the repo root. Format: **NDJSON** (one JSON object per line, ISO 8601 timestamps). A fresh file is opened on every app start; same-day restarts get a counter suffix (`.2.log.ndjson`, `.3.log.ndjson`, …). The running app always writes to the most recently modified file. See **setup.md §5** for the find-newest-by-mtime recipe.
 
-`<pkg-name>` is derived from the `name` field in `package.json` (default: `my-app` → `my-app_logs/`).
+| Log | Path | Purpose |
+|---|---|---|
+| App log | `logs/app.<YYYY-MM-DD>[.N].log.ndjson` | All levels (debug+ in dev, info+ in prod). |
+| Error log | `logs/error.<YYYY-MM-DD>[.N].log.ndjson` | Errors only — check first when something breaks. |
+| Startup log | `app-startup.log` (repo root) | `start.sh` bootstrap output. Read first if the app fails to start. |
+| PostgreSQL | `pg-data/pg.log` | Database daemon log. Check on `ECONNREFUSED 127.0.0.1:5432`. |
 
 ### Common Failures
 
@@ -220,7 +201,7 @@ To add a new feature end-to-end:
 5. **Page or component** — create a `"use client"` component in `src/views/` or `src/components/`. Fetch via `useQuery({ queryFn: api.<method> })`. If it's a page, also create `app/<route>/page.tsx` that re-exports it: `export { default } from "@/views/MyPage"`.
 6. **Sidebar entry (if it's a page users navigate to)** — add an item to `menuGroups` in `src/components/DashboardLayout.tsx`: `{ icon, label: "<i18n_key>", path: "/your-page", roles?: ["admin"] }`. Skip this step if the page is intentionally opt-in by URL only.
 7. **i18n** — add every user-facing string as a key in `src/locales/de/common.json` AND `en/common.json`. Use `const { t } = useTranslation(); t("key")`. The sidebar `label` is an i18n key, not a literal string.
-8. **Verify** — `pnpm check` (types), `pnpm lint`, manual test at `http://localhost:8497`.
+8. **Verify** — `pnpm check`, `pnpm lint`, browser test at the debug-app friendly URL (HMR has reloaded already), then `pnpm build` once when the feature is fully done.
 
 ## Quick Patterns
 
@@ -314,7 +295,7 @@ OPENAI_MODEL=gpt-4o-mini
 Never:
 
 - Deploy without building first. `pnpm start` serves from `.next/` — run `pnpm build` and check its output for errors before starting. On runners, use `start.sh` (it builds automatically).
-- Claim the app is working without verifying. After starting, check `curl localhost:PORT/api/health` → `{"status":"ok"}` and open the app in a browser. If something fails, read the logs (see **Log Files** above) before making more changes.
+- Claim the app is working without verifying. After `start_app`, open the debug-app friendly URL in the browser, exercise the feature, and read the newest `logs/error.*.log.ndjson`. If something fails, read the logs (see **Log Files** above) before making more changes.
 - Run `db:push` against a production database or any database with real data. Use `pnpm db:generate` + `pnpm db:migrate` instead. See **Database Migrations** above.
 - Skip committing migration files. The `.sql` files in `drizzle/migrations/` are version-controlled — they are the authoritative record of every schema change.
 - Run raw SQL (`CREATE TABLE`, `ALTER TABLE`, `DROP`) to change the schema. All changes go through `drizzle/schema.ts` → `pnpm db:generate`.
@@ -324,9 +305,9 @@ Never:
 - Scatter drizzle queries across route handlers. Put them in `server/db.ts`.
 - Hardcode `APP_NAME`, support email, or copy strings. Use `shared/config.ts` and i18n keys.
 - Assume the app is served from `/`. Use `BASE_PATH` / `getApiBase()` from `src/lib/basePath.ts` for client-side URL construction.
-- Use `console.log/error/warn` in server code. Import `logger` from `server/utils/logger.ts` and use `logger.info/warn/error/debug`. Pass errors as `logger.error({ err }, "message")`. Logs land in `<pkg-name>_logs/app.log` (all levels) and `error.log` (errors). Dev defaults to `debug`, prod to `info`; override with `LOG_LEVEL`.
+- Use `console.log/error/warn` in server code. Import `logger` from `server/utils/logger.ts` and use `logger.info/warn/error/debug`. Pass errors as `logger.error({ err }, "message")`. Logs land in `logs/app.<date>.log.ndjson` (all levels) and `logs/error.<date>.log.ndjson` (errors); a fresh file is opened on every app start. Dev defaults to `debug`, prod to `info`; override with `LOG_LEVEL`.
 - Access `localStorage` or `window` in component top-level state initializers — Next.js SSRs `"use client"` components for the initial HTML. Guard with `if (typeof window === "undefined")`.
-- Commit `.env`, `pg-data/`, `uploads/`, `data/`, `.next/`, `*_logs/`.
+- Commit `.env`, `pg-data/`, `uploads/`, `data/`, `.next/`, `logs/`.
 - Skip git hooks with `--no-verify`.
 - Use `any`, `console.log` in committed code, or browser `alert`.
 

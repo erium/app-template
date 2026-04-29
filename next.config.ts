@@ -7,7 +7,7 @@ const nextConfig: NextConfig = {
     "playwright",
     "nodemailer",
     "pino",
-    "pino-roll",
+    "pino-pretty",
     "bcryptjs",
   ],
 };

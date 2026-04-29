@@ -1,50 +1,52 @@
-import { readFileSync } from "node:fs";
+import { createWriteStream, mkdirSync, readdirSync } from "node:fs";
+import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
+import { type Transform } from "node:stream";
 import { fileURLToPath } from "node:url";
-import pino, { type Logger } from "pino";
+import pino, { type Level, type Logger, type StreamEntry } from "pino";
 
-// Resolve the repo root (two levels up from this file) so log paths work
-// whether the server runs via tsx (source) or the esbuild bundle (dist).
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, "..", "..");
-
-function readPackageName(): string {
-  try {
-    const pkg = JSON.parse(readFileSync(resolve(REPO_ROOT, "package.json"), "utf-8"));
-    if (typeof pkg.name === "string" && pkg.name.length > 0) return pkg.name;
-  } catch {
-    // fall through
-  }
-  return "app";
-}
-
-const APP_SLUG = readPackageName().toLowerCase().replace(/[^a-z0-9-]+/g, "-");
-export const LOG_DIR = resolve(REPO_ROOT, `${APP_SLUG}_logs`);
+export const LOG_DIR = resolve(REPO_ROOT, "logs");
 
 const isDev = process.env.NODE_ENV !== "production";
-const level = process.env.LOG_LEVEL ?? (isDev ? "debug" : "info");
+const level = (process.env.LOG_LEVEL ?? (isDev ? "debug" : "info")) as Level;
 
-const rollOpts = (name: string) => ({
-  file: resolve(LOG_DIR, name),
-  frequency: "daily",
-  size: "10m",
-  mkdir: true,
-});
+mkdirSync(LOG_DIR, { recursive: true });
 
-const targets: pino.TransportTargetOptions[] = [
-  { target: "pino-roll", level, options: rollOpts("app.log") },
-  { target: "pino-roll", level: "error", options: rollOpts("error.log") },
+// Each process start opens a fresh log file: `<base>.<YYYY-MM-DD>.log` for the
+// first start of the day, `<base>.<YYYY-MM-DD>.2.log` for the second, etc.
+// Counter is derived from existing files in LOG_DIR so concurrent or restarted
+// processes never collide.
+function nextLogPath(base: string): string {
+  const today = new Date().toISOString().slice(0, 10);
+  const re = new RegExp(`^${base}\\.${today}(?:\\.(\\d+))?\\.log\\.ndjson$`);
+  let max = 0;
+  for (const f of readdirSync(LOG_DIR)) {
+    const m = f.match(re);
+    if (m) max = Math.max(max, m[1] ? parseInt(m[1], 10) : 1);
+  }
+  const counter = max + 1;
+  const suffix = counter === 1 ? "" : `.${counter}`;
+  return resolve(LOG_DIR, `${base}.${today}${suffix}.log.ndjson`);
+}
+
+const streams: StreamEntry[] = [
+  { level, stream: createWriteStream(nextLogPath("app"), { flags: "a" }) },
+  { level: "error", stream: createWriteStream(nextLogPath("error"), { flags: "a" }) },
 ];
 
 if (isDev) {
-  targets.push({
-    target: "pino-pretty",
-    level,
-    options: { destination: 1, colorize: true, translateTime: "SYS:HH:MM:ss.l" },
-  });
+  // pino-pretty is dev-only — load via createRequire so production bundles
+  // never try to resolve it.
+  const require = createRequire(import.meta.url);
+  const pretty = require("pino-pretty") as (opts: object) => Transform;
+  const prettyStream = pretty({ colorize: true, translateTime: "SYS:HH:MM:ss.l" });
+  prettyStream.pipe(process.stdout);
+  streams.push({ level, stream: prettyStream });
 }
 
 export const logger: Logger = pino(
   { level, timestamp: pino.stdTimeFunctions.isoTime },
-  pino.transport({ targets }),
+  pino.multistream(streams),
 );

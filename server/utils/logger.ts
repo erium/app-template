@@ -2,7 +2,6 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import pino, { type Logger } from "pino";
-import pinoHttp from "pino-http";
 
 // Resolve the repo root (two levels up from this file) so log paths work
 // whether the server runs via tsx (source) or the esbuild bundle (dist).
@@ -45,13 +44,7 @@ if (isDev) {
   });
 }
 
-export const logger: Logger = pino({ level }, pino.transport({ targets }));
-
-export const httpLogger = pinoHttp({
-  logger,
-  customLogLevel: (_req, res, err) => {
-    if (err || res.statusCode >= 500) return "error";
-    if (res.statusCode >= 400) return "warn";
-    return "info";
-  },
-});
+export const logger: Logger = pino(
+  { level, timestamp: pino.stdTimeFunctions.isoTime },
+  pino.transport({ targets }),
+);

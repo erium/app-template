@@ -8,7 +8,6 @@ const nextConfig: NextConfig = {
     "nodemailer",
     "pino",
     "pino-roll",
-    "pino-http",
     "bcryptjs",
   ],
 };

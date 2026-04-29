@@ -65,6 +65,7 @@ Plan Structure: Your plan must always contain:
     - The debug app MUST be created as a **public** app. Otherwise the browser cannot reach the friendly URL for QA testing and you cannot verify any feature visually. (The production app may be public or private as the user prefers.)
     - No `start_app` / `update_app` / `restart_app` without `pnpm check` AND `pnpm lint` passing first. A failing `tsc` makes the dev server crash on boot — Next.js compile errors do NOT appear in `logs/error.*.log.ndjson` (those are pino runtime logs). The app then crash-loops with a clean `app-startup.log` and clean pino logs, and you'll waste hours guessing. Always type-check the code BEFORE asking the runner to start it.
   - **Code rules:**
+    - No `npm` / `npx` / `yarn` — always `pnpm` / `pnpm dlx`. This project uses pnpm 10 with `pnpm-lock.yaml`. Running `npm install` creates a conflicting `package-lock.json`, ignores pnpm-specific resolutions, and may install different transitive versions — quietly breaking the app. Same for `npm run <script>`: use `pnpm <script>`.
     - No file in `src/views/` without `"use client"` on line 1
     - No `localStorage` / `window` / `document` access without an `if (typeof window === "undefined") return;` guard
     - No new i18n key without adding to BOTH `src/locales/de/common.json` AND `src/locales/en/common.json`

@@ -61,6 +61,8 @@ Plan Structure: Your plan must always contain:
   - **App lifecycle (read §3 before EVERY `create_app` call — do not rely on the generic `create_app` examples in your system prompt):**
     - No `create_app` without TWO apps in the same session: `<app>_debug` AND `<app>` (production). Single-app setup is forbidden.
     - No `start_commands` other than `bash start.sh --dev <PORT>` (debug) or `bash start.sh <PORT>` (prod). NEVER `pnpm dev`, `pnpm start`, `pnpm install`, `bash setup-postgres.sh`, `pnpm db:push`, `pnpm db:seed`, or any combination of these — `start.sh` already runs all of them and handles Node 20 + Halerium sub-path. Manual commands skip these and the app silently breaks.
+    - No `nano` runner. The absolute minimum is `small` — `nano` cannot build or even run a Next.js + Postgres app and `start.sh` will OOM. Use `small` or larger for both apps.
+    - The debug app MUST be created as a **public** app. Otherwise the browser cannot reach the friendly URL for QA testing and you cannot verify any feature visually. (The production app may be public or private as the user prefers.)
     - No `start_app` / `update_app` / `restart_app` without `pnpm check` AND `pnpm lint` passing first. A failing `tsc` makes the dev server crash on boot — Next.js compile errors do NOT appear in `logs/error.*.log.ndjson` (those are pino runtime logs). The app then crash-loops with a clean `app-startup.log` and clean pino logs, and you'll waste hours guessing. Always type-check the code BEFORE asking the runner to start it.
   - **Code rules:**
     - No file in `src/views/` without `"use client"` on line 1
@@ -94,6 +96,10 @@ For every project, create **TWO apps** up front via `create_app` — one for dev
 | Production | `<app>`       | `bash start.sh <PORT>`       | Final verification of the production build. Start only after a feature is finished.          |
 
 `working_directory` for both is the project root. `<PORT>` is the port the Control App assigned to that app.
+
+**Runner size:** minimum `small` for both apps. `nano` runners cannot build or run a Next.js + Postgres app and `start.sh` will OOM mid-bootstrap (often without a clear error — the process is just killed). Use `small` or larger.
+
+**Visibility:** the debug app **must be public** so the browser can reach the friendly URL for QA testing (see §6) — a private debug app is unreachable and blocks all visual verification. The production app can be public or private as the user prefers.
 
 **Forbidden `start_commands` values** — do not use any of these, alone or chained:
 

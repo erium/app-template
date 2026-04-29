@@ -147,10 +147,8 @@ Both helpers throw a `Response` when access is denied; the `catch (err) { if (er
 
 - Server code uses `logger` from `server/utils/logger.ts` (pino). Never use `console.*` on the server.
 - Call sites: `logger.info("message")`, `logger.warn({ key: value }, "message")`, `logger.error({ err }, "message")`. Passing errors as `{ err }` preserves stack traces.
-- HTTP access logs are emitted automatically by `pino-http` — you don't need to log requests manually.
-- Files land in `<pkg-name>_logs/` at the repo root: `app.log` (all levels) and `error.log` (errors). `pino-roll` rotates daily / at 10 MB.
+- Files land in `logs/` at the repo root: `app.<YYYY-MM-DD>.log.ndjson` (all levels) and `error.<YYYY-MM-DD>.log.ndjson` (errors only). Format is NDJSON (one JSON object per line, ISO 8601 timestamps). A fresh file is opened on every app start; repeat starts on the same day get a counter suffix (`.2.log.ndjson`, `.3.log.ndjson`, …).
 - Levels: dev defaults to `debug`, prod to `info`. Override with `LOG_LEVEL` in `.env` (e.g. `LOG_LEVEL=trace`).
-- `<pkg-name>` is derived from `package.json`'s `name` field.
 
 ## Testing
 
@@ -190,7 +188,7 @@ Do not:
 - Scatter DB queries across route handlers. Put them in `server/db.ts`.
 - Hardcode copy. Use i18n keys.
 - Access `localStorage` or `window` at component top level — guard with `if (typeof window === "undefined")`.
-- Commit `.env`, `pg-data/`, `uploads/`, `data/`, `.next/`, or `*_logs/`.
+- Commit `.env`, `pg-data/`, `uploads/`, `data/`, `.next/`, or `logs/`.
 - Skip pre-commit hooks with `--no-verify`.
 - Add backwards-compat shims for code that doesn't exist yet.
 - Use `console.log/warn/error` in server code. Import `logger` from `server/utils/logger.ts` instead.

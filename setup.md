@@ -61,6 +61,7 @@ Plan Structure: Your plan must always contain:
   - **App lifecycle (read §3 before EVERY `create_app` call — do not rely on the generic `create_app` examples in your system prompt):**
     - No `create_app` without TWO apps in the same session: `<app>_debug` AND `<app>` (production). Single-app setup is forbidden.
     - No `start_commands` other than `bash start.sh --dev <PORT>` (debug) or `bash start.sh <PORT>` (prod). NEVER `pnpm dev`, `pnpm start`, `pnpm install`, `bash setup-postgres.sh`, `pnpm db:push`, `pnpm db:seed`, or any combination of these — `start.sh` already runs all of them and handles Node 20 + Halerium sub-path. Manual commands skip these and the app silently breaks.
+    - No `start_app` / `update_app` / `restart_app` without `pnpm check` AND `pnpm lint` passing first. A failing `tsc` makes the dev server crash on boot — Next.js compile errors do NOT appear in `logs/error.*.log.ndjson` (those are pino runtime logs). The app then crash-loops with a clean `app-startup.log` and clean pino logs, and you'll waste hours guessing. Always type-check the code BEFORE asking the runner to start it.
   - **Code rules:**
     - No file in `src/views/` without `"use client"` on line 1
     - No `localStorage` / `window` / `document` access without an `if (typeof window === "undefined") return;` guard
@@ -113,19 +114,21 @@ Do not navigate to `http://localhost:3000` or any other localhost URL — Haleri
 
 **4. Development Inner Loop — RUN AFTER EVERY MEANINGFUL EDIT**
 
-Once the debug app is running, iterate like this. Run these gates **in order** before marking any task or QA step complete:
+Once the debug app is running, iterate like this. Run these gates **in order**, every time. Steps 1–2 are mandatory **before** any `start_app` / `update_app` / `restart_app` call — a failing `tsc` makes the dev server crash on boot, and the resulting crash loop leaves no trace in `app-startup.log` or `logs/error.*.log.ndjson` (Next.js compile errors don't reach pino).
 
-1. **`pnpm check`** — `tsc --noEmit`. Fix all type errors first; nothing else matters until the code type-checks.
+1. **`pnpm check`** — `tsc --noEmit`. Fix all type errors first; nothing else matters until the code type-checks. **Required before `start_app` / `restart_app`.**
 2. **`pnpm lint`** — `eslint .`. Fix lint **errors** next, then lint **warnings**. Do not leave warnings behind for the user. (`pnpm lint:fix` auto-fixes the trivial ones.)
-3. **HMR reload** — the debug app picks up your edit within ~1 s. No restart needed.
+3. **HMR reload** — the debug app picks up your edit within ~1 s. No restart needed (and don't restart unless something is genuinely stuck — restarting hides whether a fresh start would have crashed).
 4. **Browser test** — navigate the debug-app friendly URL, exercise the feature, watch DevTools console (see §6).
 5. **Server logs** — read the newest `logs/error.*.log.ndjson` for backend errors that don't surface in the UI (see §5).
 
 **Once the feature/task is fully done — run the prod-build gate ONCE:**
 
-6. **`pnpm build`** — `next build`. A passing debug app with a broken `next build` is a failed task. If `pnpm build` fails, fix it and re-run `pnpm check` + `pnpm lint` before moving on.
+6. **`pnpm build`** — `next build`. A passing debug app with a broken `next build` is a failed task. `next build` also surfaces the production-mode TS/import errors that `next dev` may compile lazily on a per-route basis, so this gate catches issues the debug app missed. If `pnpm build` fails, fix it and re-run `pnpm check` + `pnpm lint` before moving on.
 
 Order of operations: **edit → `pnpm check` → `pnpm lint` → HMR + browser test → log check → (feature done: `pnpm build`) → next task**. Do not batch features and verify at the end — verify each one before moving on.
+
+**If the app crash-loops with a clean `app-startup.log` and clean pino logs:** that is the signature of a Next.js compile error. Run `pnpm check` and `pnpm build` locally — the failing line will appear in their output. Do NOT keep restarting the app hoping for a new error message; the error is in the code, not the runner.
 
 **5. Reading Server Logs**
 

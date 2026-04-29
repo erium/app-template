@@ -64,12 +64,12 @@ The friendly URL returned by `create_app` is what the browser navigates to (neve
 
 ### Log Files
 
-Logs live in `logs/` at the repo root. Format: **NDJSON** (one JSON object per line, ISO 8601 timestamps). A fresh file is opened on every app start; same-day restarts get a counter suffix (`.2.log.ndjson`, `.3.log.ndjson`, …). The running app always writes to the most recently modified file. See **setup.md §5** for the find-newest-by-mtime recipe.
+Logs live in `logs/` at the repo root. Format: **NDJSON** (one JSON object per line, ISO 8601 timestamps). One file per day per stream — restarts on the same day append to the existing file. See **setup.md §5** for the find-newest-by-mtime recipe.
 
 | Log | Path | Purpose |
 |---|---|---|
-| App log | `logs/app.<YYYY-MM-DD>[.N].log.ndjson` | All levels (debug+ in dev, info+ in prod). |
-| Error log | `logs/error.<YYYY-MM-DD>[.N].log.ndjson` | Errors only — check first when something breaks. |
+| App log | `logs/app.<YYYY-MM-DD>.log.ndjson` | All levels (debug+ in dev, info+ in prod). |
+| Error log | `logs/error.<YYYY-MM-DD>.log.ndjson` | Errors only — check first when something breaks. |
 | Startup log | `app-startup.log` (repo root) | `start.sh` bootstrap output. Read first if the app fails to start. |
 | PostgreSQL | `pg-data/pg.log` | Database daemon log. Check on `ECONNREFUSED 127.0.0.1:5432`. |
 
@@ -307,7 +307,7 @@ Never:
 - Scatter drizzle queries across route handlers. Put them in `server/db.ts`.
 - Hardcode `APP_NAME`, support email, or copy strings. Use `shared/config.ts` and i18n keys.
 - Assume the app is served from `/`. Use `BASE_PATH` / `getApiBase()` from `src/lib/basePath.ts` for client-side URL construction.
-- Use `console.log/error/warn` in server code. Import `logger` from `server/utils/logger.ts` and use `logger.info/warn/error/debug`. Pass errors as `logger.error({ err }, "message")`. Logs land in `logs/app.<date>.log.ndjson` (all levels) and `logs/error.<date>.log.ndjson` (errors); a fresh file is opened on every app start. Dev defaults to `debug`, prod to `info`; override with `LOG_LEVEL`.
+- Use `console.log/error/warn` in server code. Import `logger` from `server/utils/logger.ts` and use `logger.info/warn/error/debug`. Pass errors as `logger.error({ err }, "message")`. Logs land in `logs/app.<date>.log.ndjson` (all levels) and `logs/error.<date>.log.ndjson` (errors); one file per day per stream — restarts on the same day append. Dev defaults to `debug`, prod to `info`; override with `LOG_LEVEL`.
 - Access `localStorage` or `window` in component top-level state initializers — Next.js SSRs `"use client"` components for the initial HTML. Guard with `if (typeof window === "undefined")`.
 - Commit `.env`, `pg-data/`, `uploads/`, `data/`, `.next/`, `logs/`.
 - Skip git hooks with `--no-verify`.

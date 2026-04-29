@@ -1,4 +1,4 @@
-import { createWriteStream, mkdirSync, readdirSync } from "node:fs";
+import { createWriteStream, mkdirSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import { type Transform } from "node:stream";
@@ -14,26 +14,16 @@ const level = (process.env.LOG_LEVEL ?? (isDev ? "debug" : "info")) as Level;
 
 mkdirSync(LOG_DIR, { recursive: true });
 
-// Each process start opens a fresh log file: `<base>.<YYYY-MM-DD>.log` for the
-// first start of the day, `<base>.<YYYY-MM-DD>.2.log` for the second, etc.
-// Counter is derived from existing files in LOG_DIR so concurrent or restarted
-// processes never collide.
-function nextLogPath(base: string): string {
+// One file per day per stream: `<base>.<YYYY-MM-DD>.log.ndjson`. Restarts on the
+// same day append to the existing file rather than creating numbered siblings.
+function logPath(base: string): string {
   const today = new Date().toISOString().slice(0, 10);
-  const re = new RegExp(`^${base}\\.${today}(?:\\.(\\d+))?\\.log\\.ndjson$`);
-  let max = 0;
-  for (const f of readdirSync(LOG_DIR)) {
-    const m = f.match(re);
-    if (m) max = Math.max(max, m[1] ? parseInt(m[1], 10) : 1);
-  }
-  const counter = max + 1;
-  const suffix = counter === 1 ? "" : `.${counter}`;
-  return resolve(LOG_DIR, `${base}.${today}${suffix}.log.ndjson`);
+  return resolve(LOG_DIR, `${base}.${today}.log.ndjson`);
 }
 
 const streams: StreamEntry[] = [
-  { level, stream: createWriteStream(nextLogPath("app"), { flags: "a" }) },
-  { level: "error", stream: createWriteStream(nextLogPath("error"), { flags: "a" }) },
+  { level, stream: createWriteStream(logPath("app"), { flags: "a" }) },
+  { level: "error", stream: createWriteStream(logPath("error"), { flags: "a" }) },
 ];
 
 if (isDev) {

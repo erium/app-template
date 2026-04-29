@@ -147,7 +147,7 @@ Both helpers throw a `Response` when access is denied; the `catch (err) { if (er
 
 - Server code uses `logger` from `server/utils/logger.ts` (pino). Never use `console.*` on the server.
 - Call sites: `logger.info("message")`, `logger.warn({ key: value }, "message")`, `logger.error({ err }, "message")`. Passing errors as `{ err }` preserves stack traces.
-- Files land in `logs/` at the repo root: `app.<YYYY-MM-DD>.log.ndjson` (all levels) and `error.<YYYY-MM-DD>.log.ndjson` (errors only). Format is NDJSON (one JSON object per line, ISO 8601 timestamps). A fresh file is opened on every app start; repeat starts on the same day get a counter suffix (`.2.log.ndjson`, `.3.log.ndjson`, …).
+- Files land in `logs/` at the repo root: `app.<YYYY-MM-DD>.log.ndjson` (all levels) and `error.<YYYY-MM-DD>.log.ndjson` (errors only). Format is NDJSON (one JSON object per line, ISO 8601 timestamps). One file per day per stream — restarts on the same day append to the existing file.
 - Levels: dev defaults to `debug`, prod to `info`. Override with `LOG_LEVEL` in `.env` (e.g. `LOG_LEVEL=trace`).
 
 ## Testing

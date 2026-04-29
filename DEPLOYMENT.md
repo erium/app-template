@@ -77,7 +77,7 @@ On every runner boot the script performs, idempotently:
 When the app fails to start or behaves unexpectedly on a runner, check logs **before** making code changes:
 
 1. **`app-startup.log`** (repo root) — bootstrap output from `start.sh`. Shows whether Node upgrade, pnpm install, Postgres, migrations, build, or seed failed.
-2. **`logs/error.<date>.log.ndjson`** — server runtime errors (pino, NDJSON format). If the process started but requests fail, look here. A fresh file is opened on every app start; counter suffix (`.2.log.ndjson`, `.3.log.ndjson`) increments for repeat starts on the same day.
+2. **`logs/error.<date>.log.ndjson`** — server runtime errors (pino, NDJSON format). If the process started but requests fail, look here. One file per day — restarts on the same day append to the existing file.
 3. **`pg-data/pg.log`** — PostgreSQL daemon log. Check if the database won't start or connections are refused.
 4. **Browser dev tools → Console / Network** — if the page loads but is blank or shows errors, check for failed asset requests.
 

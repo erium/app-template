@@ -131,7 +131,7 @@ Order of operations: **edit → `pnpm check` → `pnpm lint` → HMR + browser t
 
 When something fails: **read logs first, code last.** The fix is almost always visible in the error output.
 
-A fresh log file is opened on every app start; the running app always writes to the most recently modified file in `logs/`. Find and read the newest one:
+One log file per day per stream in `logs/` — restarts on the same day append to the existing file. Find and read today's:
 
 ```bash
 tail -100 "$(ls -t logs/error.*.log.ndjson | head -1)"   # newest error log (NDJSON)

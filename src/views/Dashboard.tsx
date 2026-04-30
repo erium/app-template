@@ -8,7 +8,7 @@ import { useTranslation } from "react-i18next";
 import { api, queryKeys } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
 import { Settings, Users, CreditCard, Rocket } from "lucide-react";
-import Link from "next/link";
+import { Link } from "@/lib/nav";
 
 export default function Dashboard() {
   const { user } = useAuth();

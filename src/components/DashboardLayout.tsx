@@ -34,8 +34,7 @@ import {
   Coins, Home, LogOut, MessageSquare, Settings as SettingsIcon, PanelLeft, Users
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
-import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { Link, usePathname, useRouter } from "@/lib/nav";
 import { getLoginUrl } from "@/const";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 

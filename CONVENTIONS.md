@@ -72,7 +72,7 @@ public/           Static assets (favicon.svg, etc.)
 - All user-facing strings go through `useTranslation()` → i18n keys. No hardcoded copy.
 - Use `useAuth()` for session state; do not call `/api/auth/me` directly.
 - Toast feedback via `sonner` (`toast.success`, `toast.error`). Don't use browser `alert`.
-- Client-side routing via `next/link` (`Link`) and `next/navigation` (`useRouter`, `usePathname`). Don't add wouter or react-router.
+- Client-side routing via `@/lib/nav` (`Link`, `useRouter`, `usePathname`). Never import directly from `next/link` or `next/navigation` — those bypass the Halerium-prefix wrappers and the URL bar will lack the prefix on click, breaking refresh and direct deep links. Don't add wouter or react-router either.
 - All page components in `src/views/` must have `"use client"` at the top. Guard any `localStorage`/`window` access with `if (typeof window === "undefined")` — Next.js SSRs client components for the initial HTML.
 
 ## API Routes
@@ -184,6 +184,8 @@ Schema changes go through `drizzle/schema.ts` → `pnpm db:generate` → review 
 Do not:
 
 - Reintroduce tRPC or Express. The API uses Next.js Route Handlers by design.
+- Import `next/link` or `next/navigation` directly. Use `@/lib/nav`.
+- Set `basePath` in `next.config.ts`. The Halerium proxy strips the prefix; `basePath` makes the server reject every request.
 - Add `axios`. Use `fetch` via `api.ts`.
 - Scatter DB queries across route handlers. Put them in `server/db.ts`.
 - Hardcode copy. Use i18n keys.

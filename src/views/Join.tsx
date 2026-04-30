@@ -9,7 +9,7 @@ import { api, queryKeys } from "@/lib/api";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Loader2, UserCheck } from "lucide-react";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/lib/nav";
 import { toast } from "sonner";
 
 export default function Join() {

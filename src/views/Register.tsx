@@ -10,7 +10,7 @@ import { api } from "@/lib/api";
 import { useMutation } from "@tanstack/react-query";
 import { Loader2, UserPlus, Building2, MailCheck, Brain } from "lucide-react";
 import { useState } from "react";
-import Link from "next/link";
+import { Link } from "@/lib/nav";
 import { toast } from "sonner";
 
 export default function Register() {

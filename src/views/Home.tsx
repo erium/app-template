@@ -5,8 +5,7 @@ import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Brain, ArrowRight } from "lucide-react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { Link, useRouter } from "@/lib/nav";
 
 export default function Home() {
   const { isAuthenticated } = useAuth();

@@ -10,8 +10,7 @@ import { api, queryKeys } from "@/lib/api";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Loader2, LogIn, Brain } from "lucide-react";
 import { useState } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { Link, useRouter } from "@/lib/nav";
 import { toast } from "sonner";
 
 export default function Login() {
